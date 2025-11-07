@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Imperfect Turing Patterns - Gray-Scott + Diffusiophoresis</title>
+  <title>Imperfect Turing Patterns - FBO Fix</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#111111">
   <style>
@@ -19,7 +19,7 @@
     .group h3 { margin: 0 0 8px; font-size: 14px; opacity:0.9; }
     .row { display:grid; grid-template-columns: 1fr 60px; gap:10px; align-items:center; margin: 8px 0; }
     input[type=range] { width: 100%; }
-    button, .btn { background:#1b1d29; border:1px solid #2a2d3a; color:#e8e8ee; border-radius: 10px; padding:8px 10px; cursor:pointer; }
+    button { background:#1b1d29; border:1px solid #2a2d3a; color:#e8e8ee; border-radius: 10px; padding:8px 10px; cursor:pointer; }
     button:hover { background:#222538; }
     .note { font-size:12px; opacity:0.8; }
     footer { padding: 8px 16px; font-size: 12px; opacity: 0.75; border-top: 1px solid #222; }
@@ -30,7 +30,7 @@
 <body>
   <header>
     <img src="icons/icon-192.png" width="24" height="24" alt="icon">
-    <h1>Imperfect Turing Patterns（Gray–Scott + diffusiophoresis + hard spheres）</h1>
+    <h1>Imperfect Turing Patterns（FBO対応版）</h1>
     <div style="margin-left:auto;">
       <button id="btnInstall">PWA インストール</button>
     </div>
@@ -120,7 +120,7 @@
           <button id="btnScreenshot">PNG保存</button>
           <button id="btnClearSW">PWA更新用 全キャッシュ削除</button>
         </div>
-        <p class="note">※ 初回は一時的に模様がぼやけます。数秒～十数秒で輪郭が立ってきます。</p>
+        <p class="note">※ 初回は少しぼやけますが、数秒〜十数秒で輪郭が立ってきます。</p>
       </div>
     </div>
   </div>
@@ -130,20 +130,11 @@
 
   <script type="module" src="main.js"></script>
   <script>
-    // PWA install prompt
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-    });
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
     document.getElementById('btnInstall')?.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-        deferredPrompt = null;
-      } else {
-        alert('インストール可能な状態ではありません。ホーム画面に追加からお試しください。');
-      }
+      if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; }
+      else { alert('インストール不可の状態です。ホーム画面に追加をお試しください。'); }
     });
   </script>
 </body>

@@ -1,5 +1,5 @@
 {
-  "name": "Imperfect Turing Patterns",
+  "name": "Imperfect Turing Patterns (FBO Fix)",
   "short_name": "ImperfectTP",
   "start_url": "./index.html",
   "display": "standalone",
