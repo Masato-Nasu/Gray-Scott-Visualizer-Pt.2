@@ -6,7 +6,7 @@ Gray–Scott + diffusiophoresis + hard spheres
 
 🔗 実行ページ
 
-👉 https://masato-nasu.github.io/Imperfect-Turing-Patterns/
+👉 [https://masato-nasu.github.io/Imperfect-Turing-Patterns/](https://masato-nasu.github.io/Gray-Scott-Visualizer-Pt.2/)
 
 （Chrome / Edge / Safari 推奨）
 スマートフォンでは「ホーム画面に追加」で PWA版 としてインストールできます。
