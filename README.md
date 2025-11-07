@@ -25,22 +25,6 @@ icons/
   └─ icon-512.png
 ```
 
-## 実行方法（ローカル）
-
-1. 任意のローカルHTTPサーバで配信（PWAは file:// では動きません）  
-   例: Python
-   ```bash
-   python3 -m http.server -d . 8080
-   # → http://localhost:8080/
-   ```
-
-2. ブラウザで開く（WebGL2 が必要）。右上の「PWA インストール」か、ブラウザの「ホーム画面に追加」。
-
-## GitHub Pages への配置
-
-この一式をそのままリポジトリに置き、Pages のルートを `/` に設定してください。  
-**確実更新**のため、`sw.js` 内の `CACHE` 文字列（バージョン）を更新する運用がおすすめです。
-
 ## パラメータ
 
 - **feed (F), kill (k), du, dv, dt** … Gray–Scott 基本
