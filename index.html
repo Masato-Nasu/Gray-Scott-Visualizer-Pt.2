@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Imperfect Turing Patterns - Gray-Scott + Diffusiophoresis</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0b0b0f; color: #e8e8ee; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+    header { padding: 12px 16px; display:flex; align-items:center; gap:12px; border-bottom: 1px solid #222; }
+    header h1 { font-size: 16px; margin: 0; letter-spacing: 0.2px; }
+    #wrap { display:grid; grid-template-columns: 1fr 320px; height: calc(100vh - 54px); }
+    #canvasWrap { position:relative; background: #050508; }
+    #glcanvas { width: 100%; height: 100%; display:block; }
+    #ui { padding: 12px; overflow:auto; border-left: 1px solid #222; }
+    .group { margin-bottom: 16px; border:1px solid #222; border-radius: 12px; padding: 12px; background: #111218; box-shadow: 0 4px 12px rgba(0,0,0,0.25) inset; }
+    .group h3 { margin: 0 0 8px; font-size: 14px; opacity:0.9; }
+    .row { display:grid; grid-template-columns: 1fr 60px; gap:10px; align-items:center; margin: 8px 0; }
+    input[type=range] { width: 100%; }
+    button, .btn { background:#1b1d29; border:1px solid #2a2d3a; color:#e8e8ee; border-radius: 10px; padding:8px 10px; cursor:pointer; }
+    button:hover { background:#222538; }
+    .note { font-size:12px; opacity:0.8; }
+    footer { padding: 8px 16px; font-size: 12px; opacity: 0.75; border-top: 1px solid #222; }
+    .small { font-size: 12px; opacity: 0.8; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon-192.png" width="24" height="24" alt="icon">
+    <h1>Imperfect Turing Patterns（Gray–Scott + diffusiophoresis + hard spheres）</h1>
+    <div style="margin-left:auto;">
+      <button id="btnInstall">PWA インストール</button>
+    </div>
+  </header>
+  <div id="wrap">
+    <div id="canvasWrap">
+      <canvas id="glcanvas"></canvas>
+    </div>
+    <div id="ui">
+      <div class="group">
+        <h3>基本（Gray–Scott）</h3>
+        <div class="row">
+          <label>feed F <span id="labF" class="small"></span></label>
+          <input type="range" id="feed" min="0.0" max="0.08" step="0.0005" value="0.035">
+        </div>
+        <div class="row">
+          <label>kill k <span id="labK" class="small"></span></label>
+          <input type="range" id="kill" min="0.0" max="0.09" step="0.0005" value="0.06">
+        </div>
+        <div class="row">
+          <label>D<sub>U</sub> <span id="labDU" class="small"></span></label>
+          <input type="range" id="du" min="0.0" max="2.0" step="0.01" value="0.16">
+        </div>
+        <div class="row">
+          <label>D<sub>V</sub> <span id="labDV" class="small"></span></label>
+          <input type="range" id="dv" min="0.0" max="2.0" step="0.01" value="0.08">
+        </div>
+        <div class="row">
+          <label>Δt <span id="labDT" class="small"></span></label>
+          <input type="range" id="dt" min="0.1" max="1.5" step="0.01" value="1.0">
+        </div>
+        <div class="grid2">
+          <button id="btnReset">初期化</button>
+          <button id="btnSeed">中央シード</button>
+        </div>
+      </div>
+      <div class="group">
+        <h3>新要素</h3>
+        <div class="row">
+          <label>α 拡散泳動 <span id="labAlpha" class="small"></span></label>
+          <input type="range" id="alphaDP" min="0.0" max="2.0" step="0.01" value="0.75">
+        </div>
+        <div class="row">
+          <label>λ 半径→拡散低下 <span id="labLambda" class="small"></span></label>
+          <input type="range" id="lambdaR" min="0.0" max="2.0" step="0.01" value="1.0">
+        </div>
+        <div class="row">
+          <label>β 硬球（排他） <span id="labBeta" class="small"></span></label>
+          <input type="range" id="betaHS" min="0.0" max="1.0" step="0.01" value="0.65">
+        </div>
+        <div class="row">
+          <label>t0 crowding 下限 <span id="labT0" class="small"></span></label>
+          <input type="range" id="t0HS" min="0.0" max="1.0" step="0.01" value="0.35">
+        </div>
+        <div class="row">
+          <label>t1 crowding 上限 <span id="labT1" class="small"></span></label>
+          <input type="range" id="t1HS" min="0.0" max="1.5" step="0.01" value="0.85">
+        </div>
+        <div class="row">
+          <label>ノイズ量 <span id="labNoise" class="small"></span></label>
+          <input type="range" id="noiseAmt" min="0.0" max="0.02" step="0.0005" value="0.002">
+        </div>
+        <div class="grid2">
+          <button id="btnRegenR">半径マップ再乱数化</button>
+          <button id="btnShowR">半径マップ表示/戻す</button>
+        </div>
+      </div>
+      <div class="group">
+        <h3>プリセット</h3>
+        <div class="grid2">
+          <button id="presetLeopard">Leopard</button>
+          <button id="presetPuffer">Pufferfish Hex</button>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <button id="presetZebra">Zebra</button>
+          <button id="presetMosaic">Mosaic</button>
+        </div>
+        <p class="note">※ プリセットは F,k, α, λ, β, t0,t1 をまとめて調整します。</p>
+      </div>
+      <div class="group">
+        <h3>操作</h3>
+        <div class="grid2">
+          <button id="btnPause">一時停止</button>
+          <button id="btnResume">再開</button>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <button id="btnScreenshot">PNG保存</button>
+          <button id="btnClearSW">PWA更新用 全キャッシュ削除</button>
+        </div>
+        <p class="note">※ 初回は一時的に模様がぼやけます。数秒～十数秒で輪郭が立ってきます。</p>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>© 2025 Imperfect Turing Patterns. WebGL2 required. PWA 対応。</span>
+  </footer>
+
+  <script type="module" src="main.js"></script>
+  <script>
+    // PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+    });
+    document.getElementById('btnInstall')?.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+      } else {
+        alert('インストール可能な状態ではありません。ホーム画面に追加からお試しください。');
+      }
+    });
+  </script>
+</body>
+</html>
