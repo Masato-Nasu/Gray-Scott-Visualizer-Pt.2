@@ -5,6 +5,10 @@ Reaction–Diffusion (RD)
 ヒョウ柄・シマ模様・斑点・迷路みたいな模様を自動で作って見せるツールです。
 ブラウザで開くだけで、模様が「生き物みたいに」動いて育っていきます。
 
+## 🚀 実行ページ（起動）
+
+👉 **https://masato-nasu.github.io/Gray-Scott-Visualizer-Pt.2/**
+
 ## スクリーンショット
 
 ![RD screenshot](https://raw.githubusercontent.com/Masato-Nasu/Gray-Scott-Visualizer-Pt.2/refs/heads/main/screenshot.png)
