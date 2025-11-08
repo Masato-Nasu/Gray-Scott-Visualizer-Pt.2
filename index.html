@@ -71,7 +71,7 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
     <div class="grid2" style="margin-top:8px;"><button id="btnScreenshot">PNG保存</button><button id="btnClearSW">全キャッシュ削除</button></div>
   </div>
 </div></div>
-<script type="module" src="main.exposed.js"></script>
+<script defer src="main.global.js"></script>
 <script>let dP; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dP=e;}); document.getElementById('btnInstall')?.addEventListener('click',async()=>{if(dP){dP.prompt(); await dP.userChoice; dP=null;} else alert('インストール不可の状態です');});</script>
 
 <script>
@@ -85,13 +85,17 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
 
 <script>
   (function(){
-    const log=(m)=>{ const el=document.getElementById('errlog'); el.style.display='block'; el.textContent += (m+'\n'); };
+    function log(m){ var el=document.getElementById('errlog'); if(!el) return; el.style.display='block'; el.textContent += (m+'\n'); }
     window.addEventListener('error', e=>{ log('Error: '+(e.message||e.error)); });
     window.addEventListener('unhandledrejection', e=>{ log('PromiseRejection: '+(e.reason&&e.reason.message||e.reason)); });
-    document.getElementById('btnStart')?.addEventListener('click', ()=>{
+    document.getElementById('btnStart')?.addEventListener('click', function(){
       document.getElementById('startOverlay')?.remove();
-      if(typeof window.__start==='function'){ try{ window.__start(); }catch(e){ log('start() failure: '+e.message); alert('起動エラー: '+e.message); } }
-      else{ log('window.__start が見つかりません'); }
+      if (typeof window.start === 'function') {
+        try { window.start(); } catch(e){ log('start() failure: '+e.message); alert('起動エラー: '+e.message); }
+      } else {
+        log('window.start が未定義です（スクリプト未ロード/エラー）');
+        alert('start 関数が読み込まれていません。スクリプト読み込みエラーの可能性があります。');
+      }
     });
   })();
 </script>
