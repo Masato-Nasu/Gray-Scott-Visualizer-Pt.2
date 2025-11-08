@@ -7,24 +7,7 @@ let paused=false, showRadius=false;
 
 const params={du:0.16,dv:0.08,feed:0.035,kill:0.06,dt:1.0, alphaDP:0.75,lambdaR:1.0,betaHS:0.65,t0HS:0.35,t1HS:0.85,noiseAmt:0.002};
 
-function toPixelArray(arr){
-  if(!arr) return null;
-  if(PIX_TYPE===gl.UNSIGNED_BYTE){
-    if(arr instanceof Uint8Array || arr instanceof Uint8ClampedArray) return arr;
-    const out=new Uint8Array(arr.length);
-    for(let i=0;i<arr.length;i++){
-      const v = Math.max(0, Math.min(1, arr[i]));
-      out[i] = Math.round(v*255);
-    }
-    return out;
-  }
-  // HALF_FLOAT -> Uint16Array, FLOAT -> Float32Array などはそのまま利用（既存コードが正しい型を作る前提）
-  return arr;
-}
-
-
 function log(msg){ console.log('[IMP]', msg); }
-function syncUI(){ /* no-op for safety */ }
 
 function probeRenderableFormat(){
   // Try candidates in order. Create a tiny test FBO for each and return first that completes.
@@ -45,7 +28,7 @@ function probeRenderableFormat(){
       const fb=gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
       const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.deleteFramebuffer(fb);
@@ -74,7 +57,7 @@ async function createPrograms(){
   const fsS=compile(gl.FRAGMENT_SHADER, await loadText('shaders/sim.frag'));
   const fsV=compile(gl.FRAGMENT_SHADER, await loadText('shaders/vis.frag'));
   progSim=gl.createProgram(); gl.attachShader(progSim,vs); gl.attachShader(progSim,fsS); gl.bindAttribLocation(progSim,0,'aPos'); gl.linkProgram(progSim);
-  if(!gl.getProgramParameter(progSim,gl.LINK_STATUS) && !gl.getProgramParameter(progSim,gl.LINK_STATUS)) throw new Error('link sim '+gl.getProgramInfoLog(progSim));
+  if(!gl.getProgramParameter(progSim,gl.Link_STATUS) && !gl.getProgramParameter(progSim,gl.LINK_STATUS)) throw new Error('link sim '+gl.getProgramInfoLog(progSim));
   progVis=gl.createProgram(); gl.attachShader(progVis,vs); gl.attachShader(progVis,fsV); gl.bindAttribLocation(progVis,0,'aPos'); gl.linkProgram(progVis);
   if(!gl.getProgramParameter(progVis,gl.LINK_STATUS)) throw new Error('link vis '+gl.getProgramInfoLog(progVis));
 }
@@ -93,7 +76,7 @@ function createTexture(w,h,data=null){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, toPixelArray(data));
+  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, data);
   gl.bindTexture(gl.TEXTURE_2D,null);
   return tex;
 }
@@ -102,7 +85,7 @@ function createFBO(tex){
   const fb=gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
   const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if(status!==gl.FRAMEBUFFER_COMPLETE){
@@ -183,7 +166,7 @@ function seedCenter(){
     const idx=(cy*width+cx)*4; init[idx]=0.50; init[idx+1]=0.25;
   }}
   gl.bindTexture(gl.TEXTURE_2D, texA);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, toPixelArray(init));
+  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, init);
   gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
@@ -191,14 +174,14 @@ function resetAll(){
   const size=width*height*4; const init=new Float32Array(size);
   for(let i=0;i<size;i+=4){ init[i]=1.0; init[i+1]=0.0; init[i+2]=0.0; init[i+3]=1.0; }
   gl.bindTexture(gl.TEXTURE_2D, texA);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, toPixelArray(init));
+  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, init);
   gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 async function loadShaderProgram(){
   await createPrograms();
   // draw buffers default is COLOR_ATTACHMENT0, but set once to be safe
-  if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
 }
 
 function simStep(srcTex,dstFb){

@@ -12,6 +12,34 @@ header{padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:
 .row{display:grid;grid-template-columns:1fr 60px;gap:10px;align-items:center;margin:8px 0}
 input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;color:#e8e8ee;border-radius:10px;padding:8px 10px;cursor:pointer}
 .small{font-size:12px;opacity:.8}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* === Mobile-first layout fixes === */
+@media (max-width: 820px){
+  #wrap{
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr auto !important; /* top: canvas / bottom: controls */
+    height: calc(100vh - 54px) !important;
+  }
+  #canvasWrap{ min-height: 60vh !important; }
+  #ui{
+    border-left: none !important;
+    border-top: 1px solid #222 !important;
+    max-height: 40vh !important;
+    overflow: auto !important;
+  }
+  /* when hidden, give canvas full height */
+  body.hide-ui #wrap{ grid-template-rows: 1fr !important; }
+}
+/* Collapsed state */
+body.hide-ui #ui{ display:none !important; }
+/* Floating toggle button for small screens */
+#btnToggleUIFab{
+  position: fixed; right: 12px; bottom: 12px;
+  background:#1b1d29; color:#e8e8ee; border:1px solid #333;
+  padding:10px 12px; border-radius:999px; z-index:9999; font-size:14px;
+  box-shadow:0 6px 16px rgba(0,0,0,.35);
+}
+
 </style></head>
 <body>
 <header><img src="icons/icon-192.png" width="24" height="24" alt="icon"><h1>Imperfect Turing Patterns（FBO自動プローブ版）</h1><div style="margin-left:auto"><button id="btnInstall">PWA インストール</button></div></header>
@@ -45,4 +73,22 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
 </div></div>
 <script type="module" src="main.js"></script>
 <script>let dP; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dP=e;}); document.getElementById('btnInstall')?.addEventListener('click',async()=>{if(dP){dP.prompt(); await dP.userChoice; dP=null;} else alert('インストール不可の状態です');});</script>
+
+<script>
+(function(){
+  function setHidden(h){
+    document.body.classList.toggle('hide-ui', !!h);
+    window.dispatchEvent(new Event('resize'));
+  }
+  // header button
+  document.getElementById('btnToggleUI')?.addEventListener('click', ()=>setHidden(!document.body.classList.contains('hide-ui')));
+  // floating button
+  document.getElementById('btnToggleUIFab')?.addEventListener('click', ()=>setHidden(!document.body.classList.contains('hide-ui')));
+  // Auto-hide on first load for small screens
+  if (window.matchMedia && window.matchMedia('(max-width: 820px)').matches) {
+    setHidden(true);
+  }
+})();
+</script>
+
 </body></html>
