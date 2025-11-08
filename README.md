@@ -8,7 +8,7 @@ Turing が着想したパターン生成の枠組みをベースに、濃度の�
 
 ## スクリーンショット
 
-![screenshot](main/screenshot.png)
+[![screenshot](main/screenshot.png)](https://raw.githubusercontent.com/Masato-Nasu/Gray-Scott-Visualizer-Pt.2/refs/heads/main/screenshot.png)
 
 ---
 
