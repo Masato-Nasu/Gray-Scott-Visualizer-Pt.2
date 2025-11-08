@@ -1,152 +1,84 @@
 <!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Imperfect Turing Patterns（Canvas2D互換・単一ファイル）</title>
-<meta name="theme-color" content="#111111"/>
+<html lang="ja"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Imperfect Turing Patterns - Probe FBO</title>
+<link rel="manifest" href="manifest.json"/><meta name="theme-color" content="#111111"/>
 <style>
-:root{color-scheme:dark}
-body{margin:0;background:#0b0b0f;color:#e8e8ee;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+:root{color-scheme:dark}body{margin:0;background:#0b0b0f;color:#e8e8ee;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 header{padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #222}
-#wrap{display:grid;grid-template-columns:1fr;height:calc(100vh - 54px)}
-#canvasWrap{position:relative;background:#050508}
-#view{width:100%;height:100%;display:block;image-rendering:pixelated}
-#toolbar{position:fixed;left:8px;top:60px;background:rgba(0,0,0,.5);padding:6px 8px;border-radius:10px;font-size:12px;display:flex;gap:8px;align-items:center}
-#startOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:9999}
-#startOverlay button{font-size:18px;padding:12px 18px;border-radius:12px;border:1px solid #333;background:#1b1d29;color:#e8e8ee}
-#errlog{position:fixed;left:8px;bottom:8px;right:8px;font:12px/1.4 monospace;background:rgba(0,0,0,.6);padding:6px 8px;border-radius:8px;max-height:35vh;overflow:auto;display:none}
-</style>
-</head>
+#wrap{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 54px)}
+#canvasWrap{position:relative;background:#050508}#glcanvas{width:100%;height:100%;display:block}
+#ui{padding:12px;overflow:auto;border-left:1px solid #222}.group{margin-bottom:16px;border:1px solid #222;border-radius:12px;padding:12px;background:#111218;box-shadow:0 4px 12px rgba(0,0,0,.25) inset}
+.row{display:grid;grid-template-columns:1fr 60px;gap:10px;align-items:center;margin:8px 0}
+input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;color:#e8e8ee;border-radius:10px;padding:8px 10px;cursor:pointer}
+.small{font-size:12px;opacity:.8}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* === Mobile minimal: hide controls entirely === */
+@media (max-width: 860px){
+  #wrap{
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+    height: calc(100vh - 54px) !important;
+  }
+  #ui{ display: none !important; }
+}
+/* Toggle class to show UI if needed */
+.show-ui #ui{ display:block !important; }
+
+</style></head>
 <body>
-<header><strong>Imperfect Turing Patterns（Canvas2D互換）</strong></header>
-<div id="wrap"><div id="canvasWrap"><canvas id="view"></canvas></div></div>
-<div id="toolbar">
-  速さ <input id="spd" type="range" min="1" max="5" step="1" value="3">
-  解像度 <select id="res"><option>128</option><option selected>192</option><option>256</option></select>
-  <button id="reset">リセット</button>
-</div>
-<div id="startOverlay"><button id="btnStart">タップして開始</button></div>
-<pre id="errlog"></pre>
+<header><img src="icons/icon-192.png" width="24" height="24" alt="icon"><h1>Imperfect Turing Patterns（FBO自動プローブ版）</h1><div style="margin-left:auto"><button id="btnInstall">PWA インストール</button></div></header>
+<div id="wrap"><div id="canvasWrap"><canvas id="glcanvas"></canvas></div>
+<div id="ui">
+  <div class="group"><h3>基本</h3>
+    <div class="row"><label>feed F <span id="labF" class="small"></span></label><input id="feed" type="range" min="0" max="0.08" step="0.0005" value="0.035"></div>
+    <div class="row"><label>kill k <span id="labK" class="small"></span></label><input id="kill" type="range" min="0" max="0.09" step="0.0005" value="0.06"></div>
+    <div class="row"><label>D_U <span id="labDU" class="small"></span></label><input id="du" type="range" min="0" max="2" step="0.01" value="0.16"></div>
+    <div class="row"><label>D_V <span id="labDV" class="small"></span></label><input id="dv" type="range" min="0" max="2" step="0.01" value="0.08"></div>
+    <div class="row"><label>Δt <span id="labDT" class="small"></span></label><input id="dt" type="range" min="0.1" max="1.5" step="0.01" value="1.0"></div>
+    <div class="grid2"><button id="btnReset">初期化</button><button id="btnSeed">中央シード</button></div>
+  </div>
+  <div class="group"><h3>新要素</h3>
+    <div class="row"><label>α <span id="labAlpha" class="small"></span></label><input id="alphaDP" type="range" min="0" max="2" step="0.01" value="0.75"></div>
+    <div class="row"><label>λ <span id="labLambda" class="small"></span></label><input id="lambdaR" type="range" min="0" max="2" step="0.01" value="1.0"></div>
+    <div class="row"><label>β <span id="labBeta" class="small"></span></label><input id="betaHS" type="range" min="0" max="1" step="0.01" value="0.65"></div>
+    <div class="row"><label>t0 <span id="labT0" class="small"></span></label><input id="t0HS" type="range" min="0" max="1" step="0.01" value="0.35"></div>
+    <div class="row"><label>t1 <span id="labT1" class="small"></span></label><input id="t1HS" type="range" min="0" max="1.5" step="0.01" value="0.85"></div>
+    <div class="row"><label>noise <span id="labNoise" class="small"></span></label><input id="noiseAmt" type="range" min="0" max="0.02" step="0.0005" value="0.002"></div>
+    <div class="grid2"><button id="btnRegenR">半径マップ再乱数化</button><button id="btnShowR">半径マップ表示/戻す</button></div>
+  </div>
+  <div class="group"><h3>プリセット</h3>
+    <div class="grid2"><button id="presetLeopard">Leopard</button><button id="presetPuffer">Pufferfish Hex</button></div>
+    <div class="grid2" style="margin-top:8px;"><button id="presetZebra">Zebra</button><button id="presetMosaic">Mosaic</button></div>
+  </div>
+  <div class="group"><h3>操作</h3>
+    <div class="grid2"><button id="btnPause">一時停止</button><button id="btnResume">再開</button></div>
+    <div class="grid2" style="margin-top:8px;"><button id="btnScreenshot">PNG保存</button><button id="btnClearSW">全キャッシュ削除</button></div>
+  </div>
+</div></div>
+<script type="module" src="main.js"></script>
+<script>let dP; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dP=e;}); document.getElementById('btnInstall')?.addEventListener('click',async()=>{if(dP){dP.prompt(); await dP.userChoice; dP=null;} else alert('インストール不可の状態です');});</script>
+
 <script>
 (function(){
-  function log(m){ const el=document.getElementById('errlog'); el.style.display='block'; el.textContent += (m+'\\n'); }
-  window.addEventListener('error', e=>{ log('Error: '+(e.message||e.error)); });
-  window.addEventListener('unhandledrejection', e=>{ log('PromiseRejection: '+(e.reason&&e.reason.message||e.reason)); });
-  document.getElementById('btnStart').addEventListener('click', ()=>{
-    document.getElementById('startOverlay')?.remove();
-    try{ start(); }catch(e){ log('start failure: '+e.message); alert('起動エラー: '+e.message); }
-  });
+  var h=document.querySelector('header')||document.body, t=0;
+  function tap(){
+    var now=Date.now();
+    if(now - t < 450){ // double→triple window
+      if(h.__d){ 
+        if(now - h.__d < 450){
+          document.body.classList.toggle('show-ui');
+          window.dispatchEvent(new Event('resize'));
+        }
+      }
+      h.__d = now;
+    }else{
+      h.__d = 0;
+    }
+    t = now;
+  }
+  h.addEventListener('click', tap, {passive:true});
 })();
 </script>
-<script>
-// Canvas2D版 Gray-Scott 反応拡散（CPU）
-let W=0,H=0,N=192, speed=3;
-const du=0.16, dv=0.08, feed=0.035, kill=0.06, dt=1.0;
-let A,B,A2,B2;
-const cvs=document.getElementById('view');
-const ctx=cvs.getContext('2d');
-const uiSpd=document.getElementById('spd');
-const uiRes=document.getElementById('res');
-const uiReset=document.getElementById('reset');
 
-uiSpd.addEventListener('input', e=>{ speed=+e.target.value; });
-uiRes.addEventListener('change', ()=>{ N=+uiRes.value; initField(true); });
-uiReset.addEventListener('click', ()=>initField(true));
-
-function initField(seed=true){
-  // 画面に合わせてキャンバスを拡大（描画はN×Nの低解像度で軽量化）
-  const rect = cvs.parentElement.getBoundingClientRect();
-  W = Math.max(320, rect.width|0);
-  H = Math.max(320, (rect.height||window.innerHeight-54)|0);
-  cvs.width = W;
-  cvs.height = H;
-
-  A = new Float32Array(N*N); B = new Float32Array(N*N);
-  A2= new Float32Array(N*N); B2= new Float32Array(N*N);
-  for(let i=0;i<N*N;i++){ A[i]=1; B[i]=0; }
-  if(seed){
-    const r=(N/10)|0; const cx=N>>1, cy=N>>1;
-    for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++){
-      const dx=cx+x, dy=cy+y; if(dx<0||dy<0||dx>=N||dy>=N) continue;
-      const k=(dy*N+dx);
-      const n=Math.random()<0.5?1:0;
-      A[k]=(1-n); B[k]=n;
-    }
-  }
-}
-
-function lap(src, k, w){
-  const x=k%w, y=(k/w)|0;
-  const xm = (x>0?x-1:x), xp=(x<w-1?x+1:x);
-  const ym = (y>0?y-1:y), yp=(y<w-1?y+1:y);
-  return src[ym*w+x]+src[yp*w+x]+src[y*w+xm]+src[y*w+xp]-4*src[k];
-}
-
-function step(){
-  for(let s=0;s<speed;s++){
-    for(let k=0;k<N*N;k++){
-      const La = lap(A,k,N), Lb=lap(B,k,N);
-      const a=A[k], b=B[k];
-      const rAB = a*b*b;
-      const dA = du*(La-Lb) - rAB + feed*(1.0 - a);
-      const dB = dv*(Lb-La) + rAB - (kill + feed)*b;
-      A2[k] = clamp01(a + dA*dt);
-      B2[k] = clamp01(b + dB*dt);
-    }
-    let tmp=A; A=A2; A2=tmp;
-    tmp=B; B=B2; B2=tmp;
-  }
-}
-
-function clamp01(v){ return v<0?0:(v>1?1:v); }
-
-function render(){
-  // N×N を W×H に最近傍拡大
-  const img = ctx.createImageData(N,N);
-  const d=img.data;
-  for(let k=0;k<N*N;k++){
-    const a=A[k], b=B[k];
-    const v = (a-b+1)*0.5; // 0..1
-    const r = (18 + 45*v)|0;
-    const g = (20 + 120*v)|0;
-    const bcol = (30 + 200*v)|0;
-    const i=k*4; d[i]=r; d[i+1]=g; d[i+2]=bcol; d[i+3]=255;
-  }
-  // 低解像描画→拡大
-  const tmp = document.createElement('canvas');
-  tmp.width=N; tmp.height=N;
-  const tctx=tmp.getContext('2d',{willReadFrequently:true});
-  tctx.putImageData(img,0,0);
-  ctx.imageSmoothingEnabled=false;
-  ctx.clearRect(0,0,W,H);
-  ctx.drawImage(tmp,0,0,W,H);
-}
-
-function loop(){
-  step();
-  render();
-  requestAnimationFrame(loop);
-}
-
-function bindPointer(){
-  cvs.addEventListener('pointerdown', (e)=>{
-    const rect = cvs.getBoundingClientRect();
-    const x = Math.max(0, Math.min(N-1, Math.floor((e.clientX-rect.left)/rect.width*N)));
-    const y = Math.max(0, Math.min(N-1, Math.floor((e.clientY-rect.top)/rect.height*N)));
-    const r=6;
-    for(let j=-r;j<=r;j++) for(let i=-r;i<=r;i++){
-      const dx=x+i, dy=y+j; if(dx<0||dy<0||dx>=N||dy>=N) continue;
-      const k=dy*N+dx; A[k]=0; B[k]=1;
-    }
-  });
-}
-
-function start(){
-  initField(true);
-  bindPointer();
-  requestAnimationFrame(loop);
-}
-</script>
-</body>
-</html>
+</body></html>
