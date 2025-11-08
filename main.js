@@ -1,305 +1,293 @@
-const $=(q)=>document.querySelector(q);
-const canvas=document.getElementById('glcanvas');
-let gl, progSim, progVis, vao;
-let INT_FMT, PIX_FMT, PIX_TYPE;
-let texA, texB, texRadius, fbA, fbB, width, height;
-let paused=false, showRadius=false;
+// WebGL2 Reaction–Diffusion with robust fallbacks.
+// If query ?safe=1 or checkbox 'safe' enabled, we bypass FBO sim and render a trivial shader.
 
-const params={du:0.16,dv:0.08,feed:0.035,kill:0.06,dt:1.0, alphaDP:0.75,lambdaR:1.0,betaHS:0.65,t0HS:0.35,t1HS:0.85,noiseAmt:0.002};
+const $ = (sel)=>document.querySelector(sel);
+const statusEl = $('#status');
+const canvas = $('#c');
+const ui = {
+  feed: $('#feed'),
+  kill: $('#kill'),
+  dt: $('#dt'),
+  safe: $('#safe'),
+  reset: $('#reset'),
+};
 
-function log(msg){ console.log('[IMP]', msg); }
+const url = new URL(location.href);
+if (url.searchParams.get('safe') === '1') ui.safe.checked = true;
 
-function probeRenderableFormat(){
-  // Try candidates in order. Create a tiny test FBO for each and return first that completes.
-  const candidates=[
-    {ifmt:gl.RGBA32F, type:gl.FLOAT, label:'RGBA32F/FLOAT'},
-    {ifmt:gl.RGBA16F, type:gl.HALF_FLOAT, label:'RGBA16F/HALF_FLOAT'},
-    {ifmt:gl.RGBA8,   type:gl.UNSIGNED_BYTE, label:'RGBA8/UNSIGNED_BYTE'}
-  ];
-  for(const c of candidates){
-    try{
-      const tex=gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, c.ifmt, 8, 8, 0, gl.RGBA, c.type, null);
-      const fb=gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-      const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.deleteFramebuffer(fb);
-      gl.deleteTexture(tex);
-      if(status===gl.FRAMEBUFFER_COMPLETE){ log('FBO ok: '+c.label); return c; }
-      else { log('FBO NG: '+c.label+' status='+status.toString(16)); }
-    }catch(e){ log('Probe error '+c.label+': '+e.message); }
+let gl;
+let extColorFloat = null;
+let useHalfFloat = false;
+let stateA = null, stateB = null, fbA = null, fbB = null;
+let w = 0, h = 0, texel = [0,0];
+
+function log(...args){
+  console.log(...args);
+  statusEl.textContent = args.join(' ');
+}
+
+function requireWebGL2(){
+  const attribs = { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false };
+  const ctx = canvas.getContext('webgl2', attribs);
+  if (!ctx) throw new Error('WebGL2 not supported');
+  return ctx;
+}
+
+function createShader(gl, type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+    const info = gl.getShaderInfoLog(sh);
+    console.error(info, '\n----\n', src);
+    throw new Error('Shader compile failed');
   }
-  throw new Error('No renderable color format found');
+  return sh;
 }
 
-function createGL(){
-  gl=canvas.getContext('webgl2',{antialias:false,preserveDrawingBuffer:true});
-  if(!gl){ alert('WebGL2 非対応'); throw new Error('no webgl2'); }
-  PIX_FMT=gl.RGBA;
-  const cand=probeRenderableFormat();
-  INT_FMT=cand.ifmt; PIX_TYPE=cand.type;
+function createProg(gl, vsSrc, fsSrc){
+  const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
+  const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+  const pr = gl.createProgram();
+  gl.attachShader(pr, vs);
+  gl.attachShader(pr, fs);
+  gl.bindAttribLocation(pr, 0, 'aPos'); // location=0 in vert
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)){
+    const info = gl.getProgramInfoLog(pr);
+    throw new Error('Program link failed: ' + info);
+  }
+  return pr;
 }
 
-async function loadText(url){ const r=await fetch(url); return await r.text(); }
-function compile(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ throw new Error(gl.getShaderInfoLog(s)); } return s; }
-
-async function createPrograms(){
-  const vs=compile(gl.VERTEX_SHADER, await loadText('shaders/pass.vert'));
-  const fsS=compile(gl.FRAGMENT_SHADER, await loadText('shaders/sim.frag'));
-  const fsV=compile(gl.FRAGMENT_SHADER, await loadText('shaders/vis.frag'));
-  progSim=gl.createProgram(); gl.attachShader(progSim,vs); gl.attachShader(progSim,fsS); gl.bindAttribLocation(progSim,0,'aPos'); gl.linkProgram(progSim);
-  if(!gl.getProgramParameter(progSim,gl.Link_STATUS) && !gl.getProgramParameter(progSim,gl.LINK_STATUS)) throw new Error('link sim '+gl.getProgramInfoLog(progSim));
-  progVis=gl.createProgram(); gl.attachShader(progVis,vs); gl.attachShader(progVis,fsV); gl.bindAttribLocation(progVis,0,'aPos'); gl.linkProgram(progVis);
-  if(!gl.getProgramParameter(progVis,gl.LINK_STATUS)) throw new Error('link vis '+gl.getProgramInfoLog(progVis));
-}
-
-function createFullscreenQuad(){
-  vao=gl.createVertexArray(); gl.bindVertexArray(vao);
-  const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+// Fullscreen quad
+const quad = (()=>{
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  const verts = new Float32Array([ -1,-1,  1,-1,  -1,1,   -1,1,  1,-1,  1,1 ]);
+  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   gl.bindVertexArray(null);
+  return { vao, vbo, vertexCount: 6 };
+})();
+
+let progSim, progDraw;
+let loc = {};
+
+async function loadText(path){
+  const r = await fetch(path);
+  if (!r.ok) throw new Error('Failed to fetch ' + path);
+  return await r.text();
 }
 
-function createTexture(w,h,data=null){
-  const tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+async function buildPrograms(){
+  const vs = await loadText('glsl/vert.glsl');
+  const fsSim = await loadText('glsl/sim.frag');
+  const fsDraw = await loadText('glsl/render.frag');
+  progSim = createProg(gl, vs, fsSim);
+  progDraw = createProg(gl, vs, fsDraw);
+
+  // cache uniforms
+  gl.useProgram(progSim);
+  loc.sim = {
+    uState: gl.getUniformLocation(progSim, 'uState'),
+    uTexel: gl.getUniformLocation(progSim, 'uTexel'),
+    uF: gl.getUniformLocation(progSim, 'uF'),
+    uK: gl.getUniformLocation(progSim, 'uK'),
+    uDt: gl.getUniformLocation(progSim, 'uDt'),
+  };
+  gl.useProgram(progDraw);
+  loc.draw = { uState: gl.getUniformLocation(progDraw, 'uState') };
+  gl.useProgram(null);
+}
+
+function createTexture(width, height, internal, format, type, filter){
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, data);
-  gl.bindTexture(gl.TEXTURE_2D,null);
-  return tex;
+  // allocate with null data to avoid type mismatch (no ArrayBufferView)
+  gl.texImage2D(gl.TEXTURE_2D, 0, internal, width, height, 0, format, type, null);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return t;
 }
 
-function createFBO(tex){
-  const fb=gl.createFramebuffer();
+function createFBO(texture){
+  const fb = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-  const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  if(status!==gl.FRAMEBUFFER_COMPLETE){
-    // As a last resort, switch to RGBA8 and rebuild once
-    if(INT_FMT!==gl.RGBA8){
-      console.warn('FBO incomplete -> retrying with RGBA8');
-      INT_FMT=gl.RGBA8; PIX_TYPE=gl.UNSIGNED_BYTE;
-      return null; // caller will rebuild tex/fbo
-    }
-    throw new Error('FBO incomplete');
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  // Only single attachment; drawBuffers not required. But safe to set in WebGL2:
+  if (gl.drawBuffers) gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (status !== gl.FRAMEBUFFER_COMPLETE){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    throw new Error('FBO incomplete: 0x' + status.toString(16));
   }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return fb;
 }
 
-function rebuildWithRGBA8IfNeeded(w,h){
-  if(INT_FMT===gl.RGBA8) return false;
-  const tA=createTexture(w,h,null);
-  const fb=createFBO(tA);
-  if(fb===null){ // switched to RGBA8; need full rebuild
-    return true;
-  }else{
-    gl.deleteFramebuffer(fb); gl.deleteTexture(tA);
-    return false;
+function pickRenderFormat(){
+  // Prefer RGBA16F + HALF_FLOAT if EXT_color_buffer_float present; else RGBA8 + UNSIGNED_BYTE
+  extColorFloat = gl.getExtension('EXT_color_buffer_float');
+  const hasLinear = gl.getExtension('OES_texture_float_linear') || gl.getExtension('OES_texture_half_float_linear') || true;
+  useHalfFloat = !!extColorFloat; // conservative
+  if (useHalfFloat){
+    return { internal: gl.RGBA16F, format: gl.RGBA, type: gl.HALF_FLOAT, filter: gl.LINEAR };
   }
+  return { internal: gl.RGBA8, format: gl.RGBA, type: gl.UNSIGNED_BYTE, filter: gl.LINEAR };
 }
+
+function initStateTex(t){
+  // Fill with A=1, B=0 and a small seeded square of B
+  const tmp = new Float32Array(w * h * 4);
+  for (let i=0;i<w*h;i++){
+    tmp[i*4+0] = 1.0; // A
+    tmp[i*4+1] = 0.0; // B
+    tmp[i*4+2] = 0.0;
+    tmp[i*4+3] = 1.0;
+  }
+  // seed
+  const sx = Math.floor(w*0.45), sy = Math.floor(h*0.45);
+  const ex = Math.floor(w*0.55), ey = Math.floor(h*0.55);
+  for (let y=sy;y<ey;y++){
+    for (let x=sx;x<ex;x++){
+      const idx = (y*w + x)*4;
+      tmp[idx+0] = 0.5;
+      tmp[idx+1] = 0.25;
+    }
+  }
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  // Convert to correct array type depending on texture type
+  const fmt = currentFmt.type === gl.UNSIGNED_BYTE ? new Uint8Array(tmp.map(v=>Math.max(0,Math.min(255, Math.round(v*255))))) : tmp;
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, currentFmt.format, currentFmt.type, fmt);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+}
+
+let currentFmt = null;
 
 function resize(){
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const W=canvas.clientWidth||canvas.parentElement.clientWidth;
-  const H=canvas.clientHeight||canvas.parentElement.clientHeight;
-  const w=Math.max(256, Math.floor(W*dpr));
-  const h=Math.max(256, Math.floor(H*dpr));
-  if(w===width && h===height) return;
-  width=w; height=h; canvas.width=w; canvas.height=h;
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const cw = Math.floor(canvas.clientWidth * dpr) || canvas.width;
+  const ch = Math.floor(canvas.clientHeight * dpr) || canvas.height;
+  if (cw === w && ch === h) return;
+  w = cw; h = ch;
+  canvas.width = w; canvas.height = h;
+  texel = [1/w, 1/h];
 
-  // Probe once more: if current INT_FMT fails, automatically fall back to RGBA8 and rebuild.
-  if(rebuildWithRGBA8IfNeeded(w,h)){
-    // rebuild after switching to RGBA8
-    log('Rebuild textures with RGBA8');
+  if (ui.safe.checked){
+    log('Safe mode on. Rendering without FBO.');
+    return;
   }
 
-  const size=w*h*4; const init=new Float32Array(size);
-  for(let i=0;i<size;i+=4){ init[i]=1.0; init[i+1]=0.0; init[i+2]=0.0; init[i+3]=1.0; }
-  texA=createTexture(w,h,init);
-  texB=createTexture(w,h,null);
-  fbA=createFBO(texA); if(! fbA){ // if returned null, switch happened
-    texA=createTexture(w,h,init); fbA=createFBO(texA);
+  // Recreate textures/FBOs
+  currentFmt = pickRenderFormat();
+  log(`Creating render targets: ${w}x${h} type=${currentFmt.type===gl.HALF_FLOAT?'HALF_FLOAT':'U8'}`);
+
+  [stateA, stateB].forEach(t=>{ if (t) gl.deleteTexture(t); });
+  [fbA, fbB].forEach(f=>{ if (f) gl.deleteFramebuffer(f); });
+
+  stateA = createTexture(w, h, currentFmt.internal, currentFmt.format, currentFmt.type, currentFmt.filter);
+  stateB = createTexture(w, h, currentFmt.internal, currentFmt.format, currentFmt.type, currentFmt.filter);
+  initStateTex(stateA);
+  initStateTex(stateB);
+
+  fbA = createFBO(stateA);
+  fbB = createFBO(stateB);
+}
+
+function blit(toFB, prg, uniforms){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, toFB);
+  gl.useProgram(prg);
+  gl.bindVertexArray(quad.vao);
+  if (uniforms) uniforms();
+  gl.drawArrays(gl.TRIANGLES, 0, quad.vertexCount);
+  gl.bindVertexArray(null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+let rafId = 0;
+function frame(){
+  rafId = requestAnimationFrame(frame);
+
+  if (!ui.safe.checked){
+    // simulate a few steps per frame
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.BLEND);
+    gl.activeTexture(gl.TEXTURE0);
+    for (let i=0;i<8;i++){
+      // stateA -> fbB
+      gl.bindTexture(gl.TEXTURE_2D, stateA);
+      blit(fbB, progSim, ()=>{
+        gl.uniform1i(loc.sim.uState, 0);
+        gl.uniform2f(loc.sim.uTexel, texel[0], texel[1]);
+        gl.uniform1f(loc.sim.uF, parseFloat(ui.feed.value));
+        gl.uniform1f(loc.sim.uK, parseFloat(ui.kill.value));
+        gl.uniform1f(loc.sim.uDt, parseFloat(ui.dt.value) * 0.8);
+      });
+      // swap
+      let tmpT = stateA; stateA = stateB; stateB = tmpT;
+      let tmpF = fbA; fbA = fbB; fbB = tmpF;
+    }
   }
-  fbB=createFBO(texB); if(! fbB){ texB=createTexture(w,h,null); fbB=createFBO(texB); }
 
-  texRadius=makeRadiusTex(w,h,0.5,0.18);
-  seedCenter();
-}
-
-function makeRadiusTex(w,h,mean=0.5,std=0.18){
-  const data=new Float32Array(w*h*4);
-  const r=new Float32Array(w*h);
-  for(let i=0;i<w*h;i++){
-    const u1=Math.random(), u2=Math.random();
-    const g=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
-    let v=mean+std*g; v=Math.min(1,Math.max(0,v)); r[i]=v;
+  // draw to screen
+  gl.viewport(0, 0, w, h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.useProgram(progDraw);
+  gl.activeTexture(gl.TEXTURE0);
+  if (ui.safe.checked){
+    // In safe mode just display seeded pattern texture (stateA)
+    gl.bindTexture(gl.TEXTURE_2D, stateA);
+  }else{
+    gl.bindTexture(gl.TEXTURE_2D, stateA);
   }
-  const out=new Float32Array(w*h);
-  for(let y=0;y<h;y++){ for(let x=0;x<w;x++){
-    let s=0,c=0; for(let j=-1;j<=1;j++){ for(let i=-1;i<=1;i++){
-      const xx=(x+i+w)%w, yy=(y+j+h)%h; s+=r[yy*w+xx]; c++;
-    }} out[y*w+x]=s/c;
-  }}
-  for(let i=0;i<w*h;i++){ const v=out[i]; data[i*4]=v; data[i*4+1]=v; data[i*4+2]=v; data[i*4+3]=1; }
-  return createTexture(w,h,data);
-}
-
-function seedCenter(){
-  const s=32; const size=width*height*4; const init=new Float32Array(size);
-  for(let i=0;i<size;i+=4){ init[i]=1.0; init[i+1]=0.0; init[i+2]=0.0; init[i+3]=1.0; }
-  for(let y=-s;y<=s;y++){ for(let x=-s;x<=s;x++){
-    const cx=(width>>1)+x, cy=(height>>1)+y; if(cx<0||cy<0||cx>=width||cy>=height) continue;
-    const idx=(cy*width+cx)*4; init[idx]=0.50; init[idx+1]=0.25;
-  }}
-  gl.bindTexture(gl.TEXTURE_2D, texA);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, init);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-}
-
-function resetAll(){
-  const size=width*height*4; const init=new Float32Array(size);
-  for(let i=0;i<size;i+=4){ init[i]=1.0; init[i+1]=0.0; init[i+2]=0.0; init[i+3]=1.0; }
-  gl.bindTexture(gl.TEXTURE_2D, texA);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, width, height, 0, PIX_FMT, PIX_TYPE, init);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-}
-
-async function loadShaderProgram(){
-  await createPrograms();
-  // draw buffers default is COLOR_ATTACHMENT0, but set once to be safe
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-}
-
-function simStep(srcTex,dstFb){
-  gl.useProgram(progSim);
-  gl.bindVertexArray(vao);
-  gl.uniform2f(gl.getUniformLocation(progSim,'px'),1.0/width,1.0/height);
-  gl.uniform1f(gl.getUniformLocation(progSim,'du'),params.du);
-  gl.uniform1f(gl.getUniformLocation(progSim,'dv'),params.dv);
-  gl.uniform1f(gl.getUniformLocation(progSim,'feed'),params.feed);
-  gl.uniform1f(gl.getUniformLocation(progSim,'kill'),params.kill);
-  gl.uniform1f(gl.getUniformLocation(progSim,'dt'),params.dt);
-  gl.uniform1f(gl.getUniformLocation(progSim,'alphaDP'),params.alphaDP);
-  gl.uniform1f(gl.getUniformLocation(progSim,'lambdaR'),params.lambdaR);
-  gl.uniform1f(gl.getUniformLocation(progSim,'betaHS'),params.betaHS);
-  gl.uniform1f(gl.getUniformLocation(progSim,'t0HS'),params.t0HS);
-  gl.uniform1f(gl.getUniformLocation(progSim,'t1HS'),params.t1HS);
-  gl.uniform1f(gl.getUniformLocation(progSim,'noiseAmt'),params.noiseAmt);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,srcTex);
-  gl.uniform1i(gl.getUniformLocation(progSim,'uState'),0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,texRadius);
-  gl.uniform1i(gl.getUniformLocation(progSim,'uRadius'),1);
-  gl.bindFramebuffer(gl.FRAMEBUFFER,dstFb);
-  gl.viewport(0,0,width,height);
-  gl.drawArrays(gl.TRIANGLES,0,6);
-  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.uniform1i(loc.draw.uState, 0);
+  gl.bindVertexArray(quad.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, quad.vertexCount);
   gl.bindVertexArray(null);
 }
 
-function drawVis(srcTex){
-  gl.useProgram(progVis);
-  gl.bindVertexArray(vao);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,srcTex);
-  gl.uniform1i(gl.getUniformLocation(progVis,'uState'),0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,texRadius);
-  gl.uniform1i(gl.getUniformLocation(progVis,'uRadius'),1);
-  gl.uniform1i(gl.getUniformLocation(progVis,'showRadius'),showRadius?1:0);
-  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
-  gl.viewport(0,0,canvas.width,canvas.height);
-  gl.drawArrays(gl.TRIANGLES,0,6);
-  gl.bindVertexArray(null);
-}
-
-function loop(){
-  if(!paused){
-    for(let i=0;i<2;i++){ simStep(texA,fbB); let t=texA; texA=texB; texB=t; let f=fbA; fbA=fbB; fbB=f; }
+function resetState(){
+  if (!stateA || !stateB){
+    resize();
   }
-  drawVis(texA);
-  requestAnimationFrame(loop);
-}
-
-function bindUI(){
-  ['feed','kill','du','dv','dt','alphaDP','lambdaR','betaHS','t0HS','t1HS','noiseAmt'].forEach(id=>{
-    $('#'+id).addEventListener('input',e=>{ params[id]=parseFloat(e.target.value); 
-      if(id==='dt' && params.dt>1.2){ /*安全サイド*/ params.dt=1.2; $('#dt').value=1.2; }
-      updateLabels(); });
-  });
-  $('#btnReset').addEventListener('click',resetAll);
-  $('#btnSeed').addEventListener('click',seedCenter);
-  $('#btnRegenR').addEventListener('click',()=>{ gl.deleteTexture(texRadius); texRadius=makeRadiusTex(width,height,0.5,0.18); });
-  $('#btnShowR').addEventListener('click',()=>{ showRadius=!showRadius; });
-  $('#presetLeopard').addEventListener('click',()=>Object.assign(params,{feed:0.035,kill:0.060,alphaDP:0.40,lambdaR:0.80,betaHS:0.55,t0HS:0.30,t1HS:0.80})&&updateLabels()&&syncUI());
-  $('#presetPuffer').addEventListener('click',()=>Object.assign(params,{feed:0.025,kill:0.055,alphaDP:1.20,lambdaR:1.10,betaHS:0.35,t0HS:0.25,t1HS:0.70})&&updateLabels()&&syncUI());
-  $('#presetZebra').addEventListener('click',()=>Object.assign(params,{feed:0.037,kill:0.064,alphaDP:0.50,lambdaR:0.70,betaHS:0.45,t0HS:0.28,t1HS:0.80})&&updateLabels()&&syncUI());
-  $('#presetMosaic').addEventListener('click',()=>Object.assign(params,{feed:0.020,kill:0.050,alphaDP:1.40,lambdaR:1.30,betaHS:0.70,t0HS:0.35,t1HS:0.95})&&updateLabels()&&syncUI());
-  $('#btnPause').addEventListener('click',()=>paused=true);
-  $('#btnResume').addEventListener('click',()=>paused=false);
-  $('#btnScreenshot').addEventListener('click',()=>{ const a=document.createElement('a'); a.download='imperfect_turing.png'; a.href=canvas.toDataURL('image/png'); a.click(); });
-  $('#btnClearSW').addEventListener('click', async ()=>{
-    if('serviceWorker' in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ await r.unregister(); } }
-    if('caches' in window){ const keys=await caches.keys(); for(const k of keys){ await caches.delete(k); } }
-    alert('SWとキャッシュを削除しました。再読み込みしてください。');
-  });
-}
-
-function updateLabels(){
-  $('#labF').textContent=params.feed.toFixed(4);
-  $('#labK').textContent=params.kill.toFixed(4);
-  $('#labDU').textContent=params.du.toFixed(2);
-  $('#labDV').textContent=params.dv.toFixed(2);
-  $('#labDT').textContent=params.dt.toFixed(2);
-  $('#labAlpha').textContent=params.alphaDP.toFixed(2);
-  $('#labLambda').textContent=params.lambdaR.toFixed(2);
-  $('#labBeta').textContent=params.betaHS.toFixed(2);
-  $('#labT0').textContent=params.t0HS.toFixed(2);
-  $('#labT1').textContent=params.t1HS.toFixed(2);
-  $('#labNoise').textContent=params.noiseAmt.toFixed(4);
+  initStateTex(stateA);
+  initStateTex(stateB);
+  log('State reset.');
 }
 
 async function start(){
-  gl=canvas.getContext('webgl2',{antialias:false,preserveDrawingBuffer:true});
-  if(!gl){ alert('WebGL2 非対応'); return; }
-  PIX_FMT=gl.RGBA;
-  // Active probe for a guaranteed renderable format
-  const cands=[{ifmt:gl.RGBA32F,type:gl.FLOAT},{ifmt:gl.RGBA16F,type:gl.HALF_FLOAT},{ifmt:gl.RGBA8,type:gl.UNSIGNED_BYTE}];
-  let ok=false;
-  for(const c of cands){
-    try{
-      INT_FMT=c.ifmt; PIX_TYPE=c.type;
-      const tex=createTexture(8,8,null);
-      const fb=createFBO(tex);
-      if(fb){ gl.deleteFramebuffer(fb); gl.deleteTexture(tex); ok=true; break; }
-    }catch(e){}
+  try {
+    gl = requireWebGL2();
+  } catch (e){
+    statusEl.textContent = 'WebGL2 が使えません。Safe mode を有効化してください。';
+    console.error(e);
+    return;
   }
-  if(!ok){ INT_FMT=gl.RGBA8; PIX_TYPE=gl.UNSIGNED_BYTE; }
 
-  // build shaders
-  await loadShaderProgram();
-  // vao
-  const vao_ = gl.createVertexArray(); gl.bindVertexArray(vao_);
-  const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-  gl.bindVertexArray(null);
-  vao=vao_;
+  await buildPrograms();
 
-  const ro=new ResizeObserver(()=>resize()); ro.observe($('#canvasWrap'));
-  resize(); syncUI(); bindUI(); requestAnimationFrame(loop);
+  window.addEventListener('resize', ()=>{
+    try{ resize(); }catch(e){ console.error(e); }
+  });
+
+  ui.reset.addEventListener('click', resetState);
+  ui.safe.addEventListener('change', ()=>{
+    resize();
+  });
+
+  resize();
+  resetState();
+  frame();
 }
 
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js')); }
-start();
+start().catch(err=>{
+  console.error(err);
+  statusEl.textContent = '初期化エラー: ' + err.message;
+});
