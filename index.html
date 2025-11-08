@@ -2,209 +2,63 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reaction–Diffusion (CPU) — PWA</title>
-  <link rel="manifest" href="./manifest.json?v=2025-11-08-1">
-  <meta name="theme-color" content="#111111"/>
-  <style>
-    html, body { height: 100%; margin: 0; background:#111; color:#eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif; }
-    .wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px; }
-    canvas { width: min(96vw, 96vh); height: min(96vw, 96vh); image-rendering: pixelated; outline: 1px solid #333; border-radius:12px; background:#000; }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; }
-    button { padding:10px 16px; border-radius:10px; border:0; background:#2b7; color:#011; font-weight:700; cursor:pointer; }
-    button:disabled { opacity:0.5; cursor:default; }
-    .meta { opacity:0.7; font-size:12px; }
-    .badge { background:#333; padding:4px 8px; border-radius:8px; font-size:12px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Reaction–Diffusion (CPU-only, WebGL不要)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22black%22/></svg>">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrap">
-    <div class="row">
-      <span class="badge">Reaction–Diffusion (Gray–Scott) / CPU</span>
-      <span class="badge" id="status">Initializing…</span>
-      <span class="badge" id="fps">FPS: -</span>
+  <header>
+    <h1>Reaction–Diffusion (Gray–Scott) — CPU専用</h1>
+    <p class="sub">WebGL1/2が無くても動作します。ドラッグで局所注入。PNG保存可。</p>
+  </header>
+
+  <main>
+    <div class="canvas-wrap">
+      <canvas id="view"></canvas>
     </div>
-    <canvas id="view" width="640" height="640" aria-label="Reaction–Diffusion view"></canvas>
-    <div class="row">
-      <button id="btnReset">Reset</button>
-      <button id="btnBoost">Boost ×2</button>
-      <button id="btnPause">Pause</button>
-    </div>
-    <div class="meta">CPU専用（WebGL不使用）。PWA対応：オフライン起動＆自動更新。</div>
-  </div>
-  <script>
-    // PWA register (safe even on file:// is no-op)
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2025-11-08-1').then(reg => {
-          // immediate update flow
-          reg.addEventListener('updatefound', () => {
-            const nw = reg.installing;
-            nw && nw.addEventListener('statechange', () => {
-              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available, swap in
-                nw.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-          });
-          let refreshing = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return; refreshing = true; location.reload();
-          });
-        }).catch(()=>{});
-      });
-    }
-  </script>
-  <script>
-  (() => {
-    // ---- CPU Gray–Scott RD (fast fill-up, stable) ----
-    const W = 640, H = 640;
-    const canvas = document.getElementById('view');
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const img = ctx.createImageData(W, H);
-    const statusEl = document.getElementById('status');
-    const fpsEl = document.getElementById('fps');
-    const btnReset = document.getElementById('btnReset');
-    const btnBoost = document.getElementById('btnBoost');
-    const btnPause = document.getElementById('btnPause');
 
-    // Parameters tuned for quick emergence & visually pleasing texture.
-    // Classic-ish: Du=0.16, Dv=0.08, F=0.0367, k=0.0649
-    // We'll run multiple Euler steps per frame to accelerate.
-    let Du = 0.16, Dv = 0.08, F = 0.0367, k = 0.0649;
-    let stepsPerFrame = 8; // fast onset
-    let paused = false;
+    <section class="controls">
+      <div class="row">
+        <label>解像度:
+          <select id="res">
+            <option value="256">256</option>
+            <option value="384">384</option>
+            <option value="512" selected>512</option>
+            <option value="640">640</option>
+            <option value="768">768</option>
+          </select>
+        </label>
+        <label>速度:
+          <input id="speed" type="range" min="1" max="8" value="2">
+        </label>
+        <button id="reset">リセット</button>
+        <button id="seed">強注入</button>
+        <button id="save">PNG保存</button>
+      </div>
+      <div class="row grid">
+        <label>F: <input id="F" type="range" min="0.0" max="0.08" value="0.036" step="0.0005"><span id="Fv"></span></label>
+        <label>k: <input id="k" type="range" min="0.0" max="0.07" value="0.060" step="0.0005"><span id="kv"></span></label>
+        <label>Du: <input id="Du" type="range" min="0.05" max="0.4" value="0.16" step="0.005"><span id="Duv"></span></label>
+        <label>Dv: <input id="Dv" type="range" min="0.01" max="0.2" value="0.08" step="0.005"><span id="Dvv"></span></label>
+        <label>dt: <input id="dt" type="range" min="0.2" max="2.0" value="1.0" step="0.1"><span id="dtv"></span></label>
+      </div>
+      <details>
+        <summary>表示</summary>
+        <div class="row grid">
+          <label>コントラスト<input id="contrast" type="range" min="0.5" max="3.0" step="0.05" value="1.6"></label>
+          <label>明度<input id="brightness" type="range" min="-0.5" max="0.5" step="0.05" value="0.0"></label>
+          <label>反転<input id="invert" type="checkbox"></label>
+        </div>
+      </details>
+      <p class="hint">ヒント: 起動直後は全域ランダム微注入＋中央強注入で、すぐ模様が立ち上がります。</p>
+    </section>
+  </main>
 
-    const U = new Float32Array(W*H);
-    const V = new Float32Array(W*H);
-    const U2 = new Float32Array(W*H);
-    const V2 = new Float32Array(W*H);
+  <footer>
+    <small>CPU実装 / 最適化：ライン更新 + ルックアップ簡略化 / 2025-11-08</small>
+  </footer>
 
-    function seedNoise() {
-      for (let i=0;i<W*H;i++) {
-        U[i] = 1.0;
-        // Dense random to avoid "黒い団子"停滞 → すぐ全面で反応開始
-        V[i] = Math.random()*0.2; // 0〜0.2
-      }
-      // multiple random discs to kickstart
-      for (let n=0;n<10;n++) {
-        const cx = (Math.random()*0.6+0.2)*W;
-        const cy = (Math.random()*0.6+0.2)*H;
-        const r = Math.random()*30+20;
-        for (let y=(cy-r)|0; y<=(cy+r)|0; y++){
-          if (y<0 || y>=H) continue;
-          for (let x=(cx-r)|0; x<=(cx+r)|0; x++){
-            if (x<0 || x>=W) continue;
-            const dx=x-cx, dy=y-cy;
-            if (dx*dx+dy*dy<=r*r){
-              const i = y*W+x;
-              V[i] = 0.8;
-              U[i] = 0.2;
-            }
-          }
-        }
-      }
-    }
-
-    function laplacian(A, x, y) {
-      // 5-point stencil with wrap edges for seamless tiling
-      const xm = (x===0?W-1:x-1), xp = (x===W-1?0:x+1);
-      const ym = (y===0?H-1:y-1), yp = (y===H-1?0:y+1);
-      const c  = A[y*W + x];
-      const l  = A[y*W + xm];
-      const r  = A[y*W + xp];
-      const u  = A[ym*W + x];
-      const d  = A[yp*W + x];
-      return (l + r + u + d - 4.0*c);
-    }
-
-    function step() {
-      // One Euler step
-      for (let y=0;y<H;y++){
-        for (let x=0;x<W;x++){
-          const i = y*W + x;
-          const u = U[i], v = V[i];
-          const du = Du * laplacian(U, x, y) - u*v*v + F*(1.0 - u);
-          const dv = Dv * laplacian(V, x, y) + u*v*v - (F + k)*v;
-          U2[i] = u + du;
-          V2[i] = v + dv;
-        }
-      }
-      // swap
-      U.set(U2);
-      V.set(V2);
-    }
-
-    function render() {
-      // Map V to grayscale (or subtle dual-tone)
-      // quick contrast for clarity
-      const data = img.data;
-      let p = 0;
-      for (let i=0;i<W*H;i++){
-        let val = V[i];
-        val = Math.min(1, Math.max(0, val));
-        const g = (val*255)|0;
-        data[p++] = g;
-        data[p++] = g;
-        data[p++] = g;
-        data[p++] = 255;
-      }
-      ctx.putImageData(img, 0, 0);
-    }
-
-    function reset() {
-      seedNoise();
-      statusEl.textContent = 'Running (CPU)';
-    }
-
-    // Interactions
-    canvas.addEventListener('pointerdown', (e)=>{
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) * (W/rect.width));
-      const y = Math.floor((e.clientY - rect.top)  * (H/rect.height));
-      const r = 18;
-      for (let yy=y-r; yy<=y+r; yy++){
-        if (yy<0||yy>=H) continue;
-        for (let xx=x-r; xx<=x+r; xx++){
-          if (xx<0||xx>=W) continue;
-          const dx=xx-x, dy=yy-y;
-          if (dx*dx+dy*dy<=r*r){
-            const i = yy*W+xx;
-            V[i] = 0.9; U[i] = 0.1;
-          }
-        }
-      }
-    });
-
-    btnReset.addEventListener('click', reset);
-    btnBoost.addEventListener('click', ()=>{
-      stepsPerFrame = Math.min(stepsPerFrame*2, 64);
-      btnBoost.textContent = 'Boost ×' + stepsPerFrame;
-    });
-    btnPause.addEventListener('click', ()=>{
-      paused = !paused;
-      btnPause.textContent = paused ? 'Resume' : 'Pause';
-    });
-
-    // Main loop
-    let last = performance.now(), frames=0, fLast=performance.now();
-    function loop(t){
-      if (!paused){
-        for (let s=0;s<stepsPerFrame;s++) step();
-        render();
-      }
-      frames++;
-      if (t - fLast > 500){
-        const fps = (frames*1000/(t - fLast)).toFixed(1);
-        fpsEl.textContent = 'FPS: '+fps+' / steps '+stepsPerFrame;
-        frames = 0; fLast = t;
-      }
-      requestAnimationFrame(loop);
-    }
-
-    reset();
-    requestAnimationFrame(loop);
-  })();
-  </script>
+  <script src="rd_cpu.js"></script>
 </body>
 </html>
