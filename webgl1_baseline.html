@@ -1,0 +1,38 @@
+<!doctype html>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Baseline WebGL1</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0b0f;color:#e8e8ee;font-family:system-ui}
+  #btn{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000a}
+  #btn>button{font-size:18px;padding:12px 18px;border-radius:12px;border:1px solid #333;background:#1b1d29;color:#e8e8ee}
+  #log{position:fixed;left:8px;bottom:8px;right:8px;font:12px/1.4 monospace;background:#0006;padding:6px 8px;border-radius:8px;max-height:35vh;overflow:auto}
+  canvas{width:100%;height:100%;display:block}
+</style>
+<canvas id=c></canvas>
+<div id=btn><button>タップして開始</button></div>
+<pre id=log></pre>
+<script>
+const log= m=>{logEl.textContent+=m+"\n"}
+const c=document.getElementById('c'), logEl=document.getElementById('log'), btn=document.querySelector('#btn>button')
+let gl, prog, buf, raf
+window.addEventListener('error', e=>log('Error:'+ (e.message||e.error)))
+window.addEventListener('unhandledrejection', e=>log('Rej:'+ (e.reason&&e.reason.message||e.reason)))
+btn.addEventListener('click', ()=>{
+  btn.parentElement.remove()
+  gl = c.getContext('webgl', {antialias:false})
+  if(!gl){ alert('WebGL1が使えません'); log('no webgl'); return }
+  resize(); window.addEventListener('resize', resize)
+  const vsSrc='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+  const fsSrc='precision mediump float;void main(){gl_FragColor=vec4(0.35,0.55,1.,1.);}';
+  function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(o);return o}
+  const vs=sh(gl.VERTEX_SHADER,vsSrc), fs=sh(gl.FRAGMENT_SHADER, fsSrc)
+  prog=gl.createProgram(); gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog)
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ alert('LINK失敗'); log(gl.getProgramInfoLog(prog)||'link fail'); return}
+  buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW)
+  const loc=0; gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0)
+  raf=requestAnimationFrame(loop)
+})
+function resize(){ c.width=c.clientWidth; c.height=c.clientHeight; gl&&gl.viewport(0,0,c.width,c.height) }
+function loop(){ gl.clearColor(0.05,0.06,0.1,1); gl.clear(gl.COLOR_BUFFER_BIT); gl.useProgram(prog); gl.drawArrays(gl.TRIANGLES,0,3); raf=requestAnimationFrame(loop) }
+</script>
