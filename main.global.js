@@ -28,7 +28,7 @@ function probeRenderableFormat(){
       const fb=gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+      if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
       const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.deleteFramebuffer(fb);
@@ -44,8 +44,8 @@ function createGL(){
   gl=canvas.getContext('webgl2',{antialias:false,preserveDrawingBuffer:true});
   if(!gl){ alert('WebGL2 非対応'); throw new Error('no webgl2'); }
   PIX_FMT=gl.RGBA;
-  const cand=probeRenderableFormat();
-  INT_FMT=cand.ifmt; PIX_TYPE=cand.type;
+  // Ultra-compat fallback
+  INT_FMT=gl.RGBA8; PIX_TYPE=gl.UNSIGNED_BYTE;
 }
 
 async function loadText(url){ const r=await fetch(url); return await r.text(); }
@@ -76,7 +76,7 @@ function createTexture(w,h,data=null){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, data);
+  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, null);
   gl.bindTexture(gl.TEXTURE_2D,null);
   return tex;
 }
@@ -85,7 +85,7 @@ function createFBO(tex){
   const fb=gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+  if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
   const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if(status!==gl.FRAMEBUFFER_COMPLETE){
@@ -181,7 +181,7 @@ function resetAll(){
 async function loadShaderProgram(){
   await createPrograms();
   // draw buffers default is COLOR_ATTACHMENT0, but set once to be safe
-  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+  if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
 }
 
 function simStep(srcTex,dstFb){
