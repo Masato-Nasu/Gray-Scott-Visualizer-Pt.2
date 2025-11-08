@@ -24,6 +24,7 @@ function toPixelArray(arr){
 
 
 function log(msg){ console.log('[IMP]', msg); }
+function syncUI(){ /* no-op for safety */ }
 
 function probeRenderableFormat(){
   // Try candidates in order. Create a tiny test FBO for each and return first that completes.
@@ -44,7 +45,7 @@ function probeRenderableFormat(){
       const fb=gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      if (gl.drawBuffers) { gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
+      if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
       const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.deleteFramebuffer(fb);
@@ -101,7 +102,7 @@ function createFBO(tex){
   const fb=gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  if (gl.drawBuffers) { gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
+  if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
   const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   if(status!==gl.FRAMEBUFFER_COMPLETE){
@@ -197,7 +198,7 @@ function resetAll(){
 async function loadShaderProgram(){
   await createPrograms();
   // draw buffers default is COLOR_ATTACHMENT0, but set once to be safe
-  if (gl.drawBuffers) { gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
+  if (gl.drawBuffers) { if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); } }
 }
 
 function simStep(srcTex,dstFb){
