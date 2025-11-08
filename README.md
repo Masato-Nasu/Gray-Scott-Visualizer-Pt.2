@@ -1,31 +1,59 @@
-# Reaction–Diffusion (Gray–Scott) — Safe
+# PWA Drop-in Kit for Reaction–Diffusion (Imperfect Turing Patterns)
 
-堅牢な WebGL2 実装に、**Safe（RG8）** と **CPU フォールバック**を搭載した反応拡散デモです。  
-「Initializing…」のまま止まる環境でも、**Safe** または **CPU** ボタンで確実に動きます。
+この ZIP は **既存の Reaction–Diffusion アプリに PWA 機能を追加**するための「差し込みキット」です。オフライン対応・ホーム画面インストール・確実な更新（キャッシュバスティング）を実現します。
 
-## 使い方
+---
 
-1. ローカルに展開して、できれば**ローカルサーバ**で `index.html` を開きます。  
-   例）Python: `python -m http.server 8080` → `http://localhost:8080/`
-2. 画面右の **Seed** で初期スポットを追加、**Reset** で初期化。
-3. **Safe** … WebGL2 の RG8（整数テクスチャ）固定モード。FBO 周りの互換性問題を回避。  
-   **CPU** … JavaScript の純 CPU 実装（遅いが確実）。
-4. F/k, Du/Dv を調整するとパターンが変わります。
+## ✅ すぐにやること（既存の index.html に差し込み）
 
-## 仕様
+1. **ファイルを配置**
+   - `manifest.json`, `sw.js`, `register-sw.js`, `icon-192.png`, `icon-512.png` を RD アプリのルートに置く。
 
-- WebGL2 が使えれば、RG8 テクスチャ + 2枚の Ping-Pong FBO で Gray–Scott をシミュレート
-- 失敗時は例外を拾って **CPU フォールバック**（キャンバスに ImageData 描画）
-- 典型的な落とし穴（`drawBuffers`/MRT 前提、float テクスチャ非対応、FBO incomplete など）を回避
-- クエリで `?safe=1` または `?cpu=1` も指定可能
+2. **`index.html` の `<head>` に追記**
+   ```html
+   <meta name="theme-color" content="#111111">
+   <link rel="manifest" href="./manifest.json?v=202511081446">
+   <link rel="icon" href="./icon-192.png?v=202511081446">
+   ```
 
-## よくある質問
+3. **`index.html` の末尾（`</body>` 直前）に追記**
+   ```html
+   <script src="./register-sw.js?v=202511081446"></script>
+   ```
 
-- **「Initializing…」のまま動かない**  
-  → 右側の **Safe** か **CPU** を押してください。GPU/ドライバの制限が強い端末でも動作します。
-- **ローカルファイルで開くと動かない**  
-  → ブラウザのセキュリティ設定によってはブロックされます。ローカルサーバ経由で開いてください。
+> 以上で、**インストール（ホーム画面追加）** と **オフライン起動** が有効化されます。
 
-## ライセンス
+---
 
-MIT
+## 🔄 更新が確実に反映されない場合
+
+- `manifest.json` / `sw.js` / `register-sw.js` / `index.html` の参照に付けている `?v=202511081446` を、  新しい日付文字列に更新してください（例：`?v=20251108T1` → `?v=20251108T2`）。
+- `sw.js` 内のバージョン `CACHE` 名も自動でユニーク化されるため、**再読み込みで確実に更新**されます。
+
+---
+
+## 🧪 サンプル（不要なら削除OK）
+
+- `index.html` は **PWA組み込み例** です。既存アプリの `index.html` に上記 2 箇所を追加するだけでOK。
+
+---
+
+## ℹ️ 仕様メモ
+
+- **Display:** `standalone`（URLバー非表示）
+- **Start URL:** `index.html?v=202511081446`（キャッシュバスター）
+- **SW戦略:** オフライン・コアアセットは `install` 時にプリキャッシュ、同一オリジン GET は stale-while-revalidate。
+- **即時更新:** 新 SW が `installed` になったら自動 reload（`register-sw.js` 内）。
+- **アイコン:** 192/512 の PNG（マスカブル対応）。後で差し替え可。
+
+---
+
+## 👇 よくある質問
+
+- **Q. 既存コードに干渉しますか？**  A. いいえ。`<head>` と `</body>` 前に 1 行ずつ追加するだけです。
+
+- **Q. GPU/WebGL 未対応でも大丈夫？**  A. PWA 自体は問題ありません。RD の描画は、これまで通り CPU フォールバックで動作します。
+
+---
+
+© 2025 RD PWA Kit

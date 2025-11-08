@@ -2,63 +2,56 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Reaction–Diffusion (CPU-only, WebGL不要)</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22black%22/></svg>">
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reaction–Diffusion / PWA Example</title>
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="./manifest.json?v=202511081446">
+  <link rel="icon" href="./icon-192.png?v=202511081446">
+  <style>
+    html,body { margin:0; height:100%; background:#111; color:#eee; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { display:grid; place-items:center; height:100%; }
+    .card { padding:24px 28px; background:#1b1b1b; border:1px solid #2a2a2a; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    h1 { margin:0 0 8px; font-size:20px; }
+    p { margin:0; opacity:0.85; }
+    .hint { margin-top:12px; font-size:12px; opacity:.7; }
+    button { margin-top:18px; padding:10px 14px; border-radius:10px; border:1px solid #2a2a2a; background:#222; color:#eee; cursor:pointer; }
+    canvas { display:block; margin-top:16px; width:min(90vw, 720px); height:auto; border-radius:12px; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Reaction–Diffusion (Gray–Scott) — CPU専用</h1>
-    <p class="sub">WebGL1/2が無くても動作します。ドラッグで局所注入。PNG保存可。</p>
-  </header>
-
-  <main>
-    <div class="canvas-wrap">
-      <canvas id="view"></canvas>
+  <div class="wrap">
+    <div class="card">
+      <h1>Reaction–Diffusion</h1>
+      <p>Initializing…（この index.html は PWA 組み込み例です。お手元の RD アプリに <strong>manifest</strong> と <strong>register-sw.js</strong> を追加してください）</p>
+      <p class="hint">ホーム画面に追加 → オフラインで動作します。</p>
+      <button id="btn">デモ開始</button>
+      <canvas id="demo" width="360" height="240"></canvas>
     </div>
+  </div>
 
-    <section class="controls">
-      <div class="row">
-        <label>解像度:
-          <select id="res">
-            <option value="256">256</option>
-            <option value="384">384</option>
-            <option value="512" selected>512</option>
-            <option value="640">640</option>
-            <option value="768">768</option>
-          </select>
-        </label>
-        <label>速度:
-          <input id="speed" type="range" min="1" max="8" value="2">
-        </label>
-        <button id="reset">リセット</button>
-        <button id="seed">強注入</button>
-        <button id="save">PNG保存</button>
-      </div>
-      <div class="row grid">
-        <label>F: <input id="F" type="range" min="0.0" max="0.08" value="0.036" step="0.0005"><span id="Fv"></span></label>
-        <label>k: <input id="k" type="range" min="0.0" max="0.07" value="0.060" step="0.0005"><span id="kv"></span></label>
-        <label>Du: <input id="Du" type="range" min="0.05" max="0.4" value="0.16" step="0.005"><span id="Duv"></span></label>
-        <label>Dv: <input id="Dv" type="range" min="0.01" max="0.2" value="0.08" step="0.005"><span id="Dvv"></span></label>
-        <label>dt: <input id="dt" type="range" min="0.2" max="2.0" value="1.0" step="0.1"><span id="dtv"></span></label>
-      </div>
-      <details>
-        <summary>表示</summary>
-        <div class="row grid">
-          <label>コントラスト<input id="contrast" type="range" min="0.5" max="3.0" step="0.05" value="1.6"></label>
-          <label>明度<input id="brightness" type="range" min="-0.5" max="0.5" step="0.05" value="0.0"></label>
-          <label>反転<input id="invert" type="checkbox"></label>
-        </div>
-      </details>
-      <p class="hint">ヒント: 起動直後は全域ランダム微注入＋中央強注入で、すぐ模様が立ち上がります。</p>
-    </section>
-  </main>
+  <!-- Register Service Worker -->
+  <script src="./register-sw.js?v=202511081446"></script>
 
-  <footer>
-    <small>CPU実装 / 最適化：ライン更新 + ルックアップ簡略化 / 2025-11-08</small>
-  </footer>
-
-  <script src="rd_cpu.js"></script>
+  <!-- (Optional) tiny animation so the example feels alive -->
+  <script>
+    const btn = document.getElementById('btn');
+    const cvs = document.getElementById('demo');
+    const ctx = cvs.getContext('2d', { willReadFrequently: true });
+    let id;
+    function draw(t=0) {
+      const w=cvs.width, h=cvs.height;
+      const img = ctx.createImageData(w, h);
+      for (let y=0; y<h; y++) {
+        for (let x=0; x<w; x++) {
+          const i = (y*w+x)*4;
+          const v = 127 + 120*Math.sin((x*0.09)+(y*0.06)+t*0.06);
+          img.data[i+0]=v; img.data[i+1]=v; img.data[i+2]=v; img.data[i+3]=255;
+        }
+      }
+      ctx.putImageData(img,0,0);
+    }
+    function loop(t) { draw(t*0.06); id = requestAnimationFrame(loop); }
+    btn.addEventListener('click', () => { if (!id) loop(0); });
+  </script>
 </body>
 </html>
