@@ -33,8 +33,15 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
 .hide-ui #ui{ display:none; }
 .hide-ui #wrap{ grid-template-rows: 1fr; } /* canvas 全面 */
 
+
+/* --- Start overlay to ensure reliable init on mobile --- */
+#startOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:9999}
+#startOverlay button{font-size:18px;padding:12px 18px;border-radius:12px;border:1px solid #333;background:#1b1d29;color:#e8e8ee}
+#errlog{position:fixed;left:8px;bottom:8px;right:8px;font:12px/1.4 monospace;background:rgba(0,0,0,.6);padding:6px 8px;border-radius:8px;max-height:35vh;overflow:auto;display:none}
+
 </style></head>
 <body>
+<div id="startOverlay"><button id="btnStart">タップして開始</button></div><pre id="errlog"></pre>
 <header><img src="icons/icon-192.png" width="24" height="24" alt="icon"><h1>Imperfect Turing Patterns（FBO自動プローブ版）</h1><div style="margin-left:auto"><button id="btnInstall">PWA インストール</button><button id="btnToggleUI" style="margin-left:8px;">操作を開閉</button></div></header>
 <div id="wrap"><div id="canvasWrap"><canvas id="glcanvas"></canvas></div>
 <div id="ui">
@@ -64,7 +71,7 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
     <div class="grid2" style="margin-top:8px;"><button id="btnScreenshot">PNG保存</button><button id="btnClearSW">全キャッシュ削除</button></div>
   </div>
 </div></div>
-<script type="module" src="main.js"></script>
+<script type="module" src="main.nosw.js"></script>
 <script>let dP; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dP=e;}); document.getElementById('btnInstall')?.addEventListener('click',async()=>{if(dP){dP.prompt(); await dP.userChoice; dP=null;} else alert('インストール不可の状態です');});</script>
 
 <script>
@@ -73,6 +80,19 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
     document.body.classList.toggle('hide-ui');
     window.dispatchEvent(new Event('resize'));
   });
+</script>
+
+
+<script>
+  (function(){
+    const log = (m)=>{ const el=document.getElementById('errlog'); el.style.display='block'; el.textContent += (m+'\n'); };
+    window.addEventListener('error', e=>{ log('Error: '+(e.message||e.error)); });
+    window.addEventListener('unhandledrejection', e=>{ log('PromiseRejection: '+(e.reason&&e.reason.message||e.reason)); });
+    document.getElementById('btnStart')?.addEventListener('click', ()=>{
+      document.getElementById('startOverlay')?.remove();
+      try{ start(); }catch(e){ log('start() failure: '+e.message); console.error(e); alert('起動エラー: '+e.message); }
+    });
+  })();
 </script>
 
 </body></html>
