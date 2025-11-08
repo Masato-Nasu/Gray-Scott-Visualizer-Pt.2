@@ -1,59 +1,25 @@
-# PWA Drop-in Kit for Reaction–Diffusion (Imperfect Turing Patterns)
+# Reaction–Diffusion (RD)
 
-この ZIP は **既存の Reaction–Diffusion アプリに PWA 機能を追加**するための「差し込みキット」です。オフライン対応・ホーム画面インストール・確実な更新（キャッシュバスティング）を実現します。
-
----
-
-## ✅ すぐにやること（既存の index.html に差し込み）
-
-1. **ファイルを配置**
-   - `manifest.json`, `sw.js`, `register-sw.js`, `icon-192.png`, `icon-512.png` を RD アプリのルートに置く。
-
-2. **`index.html` の `<head>` に追記**
-   ```html
-   <meta name="theme-color" content="#111111">
-   <link rel="manifest" href="./manifest.json?v=202511081446">
-   <link rel="icon" href="./icon-192.png?v=202511081446">
-   ```
-
-3. **`index.html` の末尾（`</body>` 直前）に追記**
-   ```html
-   <script src="./register-sw.js?v=202511081446"></script>
-   ```
-
-> 以上で、**インストール（ホーム画面追加）** と **オフライン起動** が有効化されます。
+このアプリは、**反応拡散（Reaction–Diffusion）** をリアルタイムに可視化するシミュレータです。  
+Turing が着想したパターン生成の枠組みをベースに、濃度の拡散と化学反応（生成/消滅）を数値計算で解き、
+**ヒョウ柄・シマ模様・斑点から迷路状の紋様まで**を画面上で生成します。
 
 ---
 
-## 🔄 更新が確実に反映されない場合
+## スクリーンショット
 
-- `manifest.json` / `sw.js` / `register-sw.js` / `index.html` の参照に付けている `?v=202511081446` を、  新しい日付文字列に更新してください（例：`?v=20251108T1` → `?v=20251108T2`）。
-- `sw.js` 内のバージョン `CACHE` 名も自動でユニーク化されるため、**再読み込みで確実に更新**されます。
-
----
-
-## 🧪 サンプル（不要なら削除OK）
-
-- `index.html` は **PWA組み込み例** です。既存アプリの `index.html` に上記 2 箇所を追加するだけでOK。
+![screenshot](docs/screenshot.png)
 
 ---
 
-## ℹ️ 仕様メモ
+## PWA（ホーム画面に追加）
 
-- **Display:** `standalone`（URLバー非表示）
-- **Start URL:** `index.html?v=202511081446`（キャッシュバスター）
-- **SW戦略:** オフライン・コアアセットは `install` 時にプリキャッシュ、同一オリジン GET は stale-while-revalidate。
-- **即時更新:** 新 SW が `installed` になったら自動 reload（`register-sw.js` 内）。
-- **アイコン:** 192/512 の PNG（マスカブル対応）。後で差し替え可。
+- 対応ブラウザ（Chrome / Edge / Safari など）でページを開き、メニューから **「ホーム画面に追加」** を選びます。  
+- インストール後は **オフラインでも起動**できます（初回のみキャッシュ取得が必要）。
 
 ---
 
-## 👇 よくある質問
+## ライセンス / クレジット
 
-- **Q. 既存コードに干渉しますか？**  A. いいえ。`<head>` と `</body>` 前に 1 行ずつ追加するだけです。
-
-- **Q. GPU/WebGL 未対応でも大丈夫？**  A. PWA 自体は問題ありません。RD の描画は、これまで通り CPU フォールバックで動作します。
-
----
-
-© 2025 RD PWA Kit
+- 研究的・教育的な利用を想定しています。必要に応じてライセンス表記を調整してください。
+- 参考概念: Turing patterns / Gray–Scott model / Reaction–Diffusion systems
