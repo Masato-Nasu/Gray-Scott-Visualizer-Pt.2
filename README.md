@@ -8,7 +8,7 @@ Turing が着想したパターン生成の枠組みをベースに、濃度の�
 
 ## スクリーンショット
 
-![screenshot](docs/screenshot.png)
+![screenshot](main/screenshot.png)
 
 ---
 
