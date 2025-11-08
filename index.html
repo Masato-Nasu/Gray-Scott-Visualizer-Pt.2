@@ -1,61 +1,47 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Reaction–Diffusion (Gray–Scott) — Safe</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Reaction–Diffusion (Safe GPU/CPU Fallback)</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>Reaction–Diffusion (Gray–Scott) — Safe</h1>
-    <div id="status">Initializing…</div>
-  </header>
-
-  <main>
-    <canvas id="view" width="768" height="512"></canvas>
-    <aside>
+  <div id="app">
+    <header>
+      <h1>Reaction–Diffusion</h1>
       <div class="controls">
+        <button id="btn-gpu">GPU（WebGL2）</button>
+        <button id="btn-safe">Safe（整数テクスチャ）</button>
+        <button id="btn-cpu">CPU</button>
+        <button id="btn-reset">Reset</button>
         <label>解像度
           <select id="res">
-            <option value="512x512">512×512</option>
-            <option value="768x512" selected>768×512</option>
-            <option value="1024x768">1024×768</option>
+            <option>256</option>
+            <option selected>384</option>
+            <option>512</option>
+            <option>768</option>
           </select>
         </label>
-        <label>時間倍率
-          <input id="speed" type="range" min="0.2" max="4" step="0.1" value="1">
-          <span id="speedVal">1.0×</span>
-        </label>
-        <label>描画スケール
-          <input id="scale" type="range" min="1" max="2" step="0.01" value="1">
-          <span id="scaleVal">1.00</span>
-        </label>
-        <div class="row">
-          <button id="seed">Seed</button>
-          <button id="reset">Reset</button>
-          <button id="safe">Safe</button>
-          <button id="cpu">CPU</button>
-        </div>
-        <details>
-          <summary>パラメータ</summary>
-          <div class="grid2">
-            <label>feed F<input id="feed" type="range" min="0.0" max="0.1" step="0.0005" value="0.037"></label>
-            <label>kill k<input id="kill" type="range" min="0.0" max="0.1" step="0.0005" value="0.06"></label>
-            <label>Du<input id="du" type="range" min="0.0" max="1.0" step="0.001" value="0.16"></label>
-            <label>Dv<input id="dv" type="range" min="0.0" max="1.0" step="0.001" value="0.08"></label>
-          </div>
-        </details>
-        <p class="hint">※ うまく動かない場合は「Safe」または「CPU」をお試しください。</p>
+        <label>Speed <input id="speed" type="range" min="1" max="8" value="2"></label>
+        <label>F(feed) <input id="feed" type="range" min="0.0" max="0.08" step="0.0005" value="0.036"></label>
+        <label>k(kill) <input id="kill" type="range" min="0.0" max="0.07" step="0.0005" value="0.064"></label>
+        <label>Du <input id="du" type="range" min="0.10" max="1.20" step="0.01" value="0.16"></label>
+        <label>Dv <input id="dv" type="range" min="0.10" max="0.80" step="0.01" value="0.08"></label>
       </div>
-      <div class="logwrap"><pre id="log"></pre></div>
-    </aside>
-  </main>
-
-  <footer>
-    <small>WebGL2 / CPU フォールバック実装。© 2025</small>
-  </footer>
-
-  <script src="rd.js"></script>
+    </header>
+    <main>
+      <canvas id="view" width="768" height="768"></canvas>
+      <aside>
+        <div id="status">Initializing…</div>
+        <div class="tips">
+          <p>キャンバスをドラッグでインク（U/V）を加えられます。</p>
+          <p>GPUでエラーが出た場合は「Safe」または「CPU」をご利用ください。</p>
+        </div>
+        <pre id="log"></pre>
+      </aside>
+    </main>
+  </div>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
