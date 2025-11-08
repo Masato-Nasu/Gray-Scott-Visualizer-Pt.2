@@ -1,6 +1,6 @@
 {
-  "name": "Imperfect Turing Patterns（FBO自動プローブ版）",
-  "short_name": "Imperfect Turing（FBO）",
+  "name": "Imperfect Turing Patterns (Probe FBO)",
+  "short_name": "ImperfectTP",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b0b0f",

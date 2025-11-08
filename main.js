@@ -28,7 +28,7 @@ function probeRenderableFormat(){
       const fb=gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      if(gl.drawBuffers){ gl.drawBuffers([gl.COLOR_ATTACHMENT0]); }
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
       const status=gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.deleteFramebuffer(fb);
@@ -70,18 +70,13 @@ function createFullscreenQuad(){
   gl.bindVertexArray(null);
 }
 
-function makeZeroBuffer(w,h){
-  if(PIX_TYPE===gl.FLOAT) return new Float32Array(w*h*4);
-  if(PIX_TYPE===gl.HALF_FLOAT || PIX_TYPE===0x140B) return new Uint16Array(w*h*4);
-  return new Uint8Array(w*h*4);
-}
 function createTexture(w,h,data=null){
   const tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, (data&&data.BYTES_PER_ELEMENT)?data:makeZeroBuffer(w,h));
+  gl.texImage2D(gl.TEXTURE_2D, 0, INT_FMT, w, h, 0, PIX_FMT, PIX_TYPE, data);
   gl.bindTexture(gl.TEXTURE_2D,null);
   return tex;
 }

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Imperfect Turing Patterns（FBO自動プローブ版）</title>
+<title>Imperfect Turing Patterns - Probe FBO</title>
 <link rel="manifest" href="manifest.json"/><meta name="theme-color" content="#111111"/>
 <style>
 :root{color-scheme:dark}body{margin:0;background:#0b0b0f;color:#e8e8ee;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
@@ -12,37 +12,9 @@ header{padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:
 .row{display:grid;grid-template-columns:1fr 60px;gap:10px;align-items:center;margin:8px 0}
 input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;color:#e8e8ee;border-radius:10px;padding:8px 10px;cursor:pointer}
 .small{font-size:12px;opacity:.8}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-
-/* --- Mobile (<= 800px): 縦積み & パネル高さを抑制 --- */
-@media (max-width: 800px){
-  #wrap{
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;       /* 上: canvas / 下: 操作 */
-    height: calc(100vh - 54px);
-  }
-  #canvasWrap{ min-height: 60vh; }       /* 実行領域を優先 */
-  #ui{
-    border-left: none;
-    border-top: 1px solid #222;
-    max-height: 40vh;                    /* 操作は40%に収めてスクロール */
-    overflow: auto;
-  }
-}
-
-/* --- 開閉トグル用（body に .hide-ui を付与した時に隠す） --- */
-.hide-ui #ui{ display:none; }
-.hide-ui #wrap{ grid-template-rows: 1fr; } /* canvas 全面 */
-
-
-/* Overlay to ensure user gesture */
-#startOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.82);z-index:9999}
-#startOverlay button{font-size:18px;padding:12px 18px;border-radius:12px;border:1px solid #333;background:#1b1d29;color:#e8e8ee}
-#errlog{position:fixed;left:8px;bottom:8px;right:8px;font:12px/1.4 monospace;background:rgba(0,0,0,.6);padding:6px 8px;border-radius:8px;max-height:35vh;overflow:auto;display:none}
-
 </style></head>
 <body>
-<div id="startOverlay"><button id="btnStart">タップして開始</button></div><pre id="errlog"></pre>
-<header><img src="icons/icon-192.png" width="24" height="24" alt="icon"><h1>Imperfect Turing Patterns（FBO自動プローブ版）</h1><div style="margin-left:auto"><button id="btnInstall">PWA インストール</button><button id="btnToggleUI" style="margin-left:8px;">操作を開閉</button></div></header>
+<header><img src="icons/icon-192.png" width="24" height="24" alt="icon"><h1>Imperfect Turing Patterns（FBO自動プローブ版）</h1><div style="margin-left:auto"><button id="btnInstall">PWA インストール</button></div></header>
 <div id="wrap"><div id="canvasWrap"><canvas id="glcanvas"></canvas></div>
 <div id="ui">
   <div class="group"><h3>基本</h3>
@@ -71,33 +43,6 @@ input[type=range]{width:100%}button{background:#1b1d29;border:1px solid #2a2d3a;
     <div class="grid2" style="margin-top:8px;"><button id="btnScreenshot">PNG保存</button><button id="btnClearSW">全キャッシュ削除</button></div>
   </div>
 </div></div>
-<script defer src="main.global.js"></script>
+<script type="module" src="main.js"></script>
 <script>let dP; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dP=e;}); document.getElementById('btnInstall')?.addEventListener('click',async()=>{if(dP){dP.prompt(); await dP.userChoice; dP=null;} else alert('インストール不可の状態です');});</script>
-
-<script>
-  // 操作パネルの開閉
-  document.getElementById('btnToggleUI')?.addEventListener('click', ()=>{
-    document.body.classList.toggle('hide-ui');
-    window.dispatchEvent(new Event('resize'));
-  });
-</script>
-
-
-<script>
-  (function(){
-    function log(m){ var el=document.getElementById('errlog'); if(!el) return; el.style.display='block'; el.textContent += (m+'\n'); }
-    window.addEventListener('error', e=>{ log('Error: '+(e.message||e.error)); });
-    window.addEventListener('unhandledrejection', e=>{ log('PromiseRejection: '+(e.reason&&e.reason.message||e.reason)); });
-    document.getElementById('btnStart')?.addEventListener('click', function(){
-      document.getElementById('startOverlay')?.remove();
-      if (typeof window.start === 'function') {
-        try { window.start(); } catch(e){ log('start() failure: '+e.message); alert('起動エラー: '+e.message); }
-      } else {
-        log('window.start が未定義です（スクリプト未ロード/エラー）');
-        alert('start 関数が読み込まれていません。スクリプト読み込みエラーの可能性があります。');
-      }
-    });
-  })();
-</script>
-
 </body></html>
