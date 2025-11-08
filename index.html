@@ -1,47 +1,64 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Reaction–Diffusion (Safe GPU/CPU Fallback)</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Reaction–Diffusion (CPU-only, WebGL不要)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22black%22/></svg>">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>Reaction–Diffusion</h1>
-      <div class="controls">
-        <button id="btn-gpu">GPU（WebGL2）</button>
-        <button id="btn-safe">Safe（整数テクスチャ）</button>
-        <button id="btn-cpu">CPU</button>
-        <button id="btn-reset">Reset</button>
-        <label>解像度
+  <header>
+    <h1>Reaction–Diffusion (Gray–Scott) — CPU専用</h1>
+    <p class="sub">WebGL1/2が無くても動作します。ドラッグで局所注入。PNG保存可。</p>
+  </header>
+
+  <main>
+    <div class="canvas-wrap">
+      <canvas id="view"></canvas>
+    </div>
+
+    <section class="controls">
+      <div class="row">
+        <label>解像度:
           <select id="res">
-            <option>256</option>
-            <option selected>384</option>
-            <option>512</option>
-            <option>768</option>
+            <option value="256">256</option>
+            <option value="384">384</option>
+            <option value="512" selected>512</option>
+            <option value="640">640</option>
+            <option value="768">768</option>
           </select>
         </label>
-        <label>Speed <input id="speed" type="range" min="1" max="8" value="2"></label>
-        <label>F(feed) <input id="feed" type="range" min="0.0" max="0.08" step="0.0005" value="0.036"></label>
-        <label>k(kill) <input id="kill" type="range" min="0.0" max="0.07" step="0.0005" value="0.064"></label>
-        <label>Du <input id="du" type="range" min="0.10" max="1.20" step="0.01" value="0.16"></label>
-        <label>Dv <input id="dv" type="range" min="0.10" max="0.80" step="0.01" value="0.08"></label>
+        <label>速度:
+          <input id="speed" type="range" min="1" max="8" value="2">
+        </label>
+        <button id="reset">リセット</button>
+        <button id="seed">強注入</button>
+        <button id="save">PNG保存</button>
       </div>
-    </header>
-    <main>
-      <canvas id="view" width="768" height="768"></canvas>
-      <aside>
-        <div id="status">Initializing…</div>
-        <div class="tips">
-          <p>キャンバスをドラッグでインク（U/V）を加えられます。</p>
-          <p>GPUでエラーが出た場合は「Safe」または「CPU」をご利用ください。</p>
+      <div class="row grid">
+        <label>F: <input id="F" type="range" min="0.0" max="0.08" value="0.036" step="0.0005"><span id="Fv"></span></label>
+        <label>k: <input id="k" type="range" min="0.0" max="0.07" value="0.060" step="0.0005"><span id="kv"></span></label>
+        <label>Du: <input id="Du" type="range" min="0.05" max="0.4" value="0.16" step="0.005"><span id="Duv"></span></label>
+        <label>Dv: <input id="Dv" type="range" min="0.01" max="0.2" value="0.08" step="0.005"><span id="Dvv"></span></label>
+        <label>dt: <input id="dt" type="range" min="0.2" max="2.0" value="1.0" step="0.1"><span id="dtv"></span></label>
+      </div>
+      <details>
+        <summary>表示</summary>
+        <div class="row grid">
+          <label>コントラスト<input id="contrast" type="range" min="0.5" max="3.0" step="0.05" value="1.6"></label>
+          <label>明度<input id="brightness" type="range" min="-0.5" max="0.5" step="0.05" value="0.0"></label>
+          <label>反転<input id="invert" type="checkbox"></label>
         </div>
-        <pre id="log"></pre>
-      </aside>
-    </main>
-  </div>
-  <script type="module" src="app.js"></script>
+      </details>
+      <p class="hint">ヒント: 起動直後は全域ランダム微注入＋中央強注入で、すぐ模様が立ち上がります。</p>
+    </section>
+  </main>
+
+  <footer>
+    <small>CPU実装 / 最適化：ライン更新 + ルックアップ簡略化 / 2025-11-08</small>
+  </footer>
+
+  <script src="rd_cpu.js"></script>
 </body>
 </html>
