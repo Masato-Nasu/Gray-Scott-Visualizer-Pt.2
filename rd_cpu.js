@@ -44,7 +44,7 @@
     // Global micro-noise for fast start
     randomSprinkle(0.02, 0.02, 20000);
     // Strong central seed
-    seedCircleSymmetric((W-1)>>1, (H-1)>>1, Math.max(8, Math.floor(Math.min(W,H)*0.04)), 0.5);
+    seedCircle(W>>1, H>>1, Math.max(8, Math.floor(Math.min(W,H)*0.04)), 0.5);
     render();
   }
 
@@ -52,9 +52,9 @@
 
   function seedCircle(cx, cy, r, vVal=0.8) {
     const r2 = r*r;
-    for (let y = Math.max(0, cy-r); y <= Math.min(H-1, cy+r); y++) {
+    for (let y = Math.max(0, cy-r); y < Math.min(H, cy+r); y++) {
       const dy = y - cy;
-      for (let x = Math.max(0, cx-r); x <= Math.min(W-1, cx+r); x++) {
+      for (let x = Math.max(0, cx-r); x < Math.min(W, cx+r); x++) {
         const dx = x - cx;
         if (dx*dx + dy*dy <= r2) {
           const i = idx(x,y);
@@ -65,38 +65,14 @@
     }
   }
 
-  function symmetricCenters(x, y) {
-    const mx = W - 1 - x;
-    const my = H - 1 - y;
-    return [[x,y], [mx,y], [x,my], [mx,my]];
-  }
-
-  function seedCircleSymmetric(cx, cy, r, vVal=0.8) {
-    const seen = new Set();
-    for (const [x,y] of symmetricCenters(cx, cy)) {
-      const key = x + ',' + y;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      seedCircle(x, y, r, vVal);
-    }
-  }
-
   function randomSprinkle(vAmt = 0.03, uDrop = 0.0, count = 5000) {
-    // Generate one random value, then copy it to all four mirror positions.
-    const groups = Math.max(1, Math.ceil(count / 4));
-    for (let n = 0; n < groups; n++) {
-      const x = (Math.random() * Math.ceil(W / 2)) | 0;
-      const y = (Math.random() * Math.ceil(H / 2)) | 0;
-      const add = vAmt * (0.5 + Math.random());
-      const seen = new Set();
-      for (const [px,py] of symmetricCenters(x, y)) {
-        const key = px + ',' + py;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const i = idx(px,py);
-        V[i] = Math.min(1.0, V[i] + add);
-        U[i] = Math.max(0.0, U[i] - uDrop);
-      }
+    // Sprinkle random pixels to kick patterns quickly
+    for (let n = 0; n < count; n++) {
+      const x = (Math.random() * W) | 0;
+      const y = (Math.random() * H) | 0;
+      const i = idx(x,y);
+      V[i] = Math.min(1.0, V[i] + vAmt * (0.5 + Math.random()));
+      U[i] = Math.max(0.0, U[i] - uDrop);
     }
   }
 
@@ -184,7 +160,7 @@
     return {x,y};
   }
   function injectAt(x, y, r=6, strength=0.9) {
-    seedCircleSymmetric(x,y,r,strength);
+    seedCircle(x,y,r,strength);
   }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -206,7 +182,7 @@
   });
   seedBtn.addEventListener('click', () => {
     randomSprinkle(0.03, 0.0, 40000);
-    seedCircleSymmetric((Math.random()*W)|0, (Math.random()*H)|0, Math.max(6,(Math.random()*20)|0), 0.9);
+    seedCircle((Math.random()*W)|0, (Math.random()*H)|0, Math.max(6,(Math.random()*20)|0), 0.9);
   });
   saveBtn.addEventListener('click', () => {
     const a = document.createElement('a');
