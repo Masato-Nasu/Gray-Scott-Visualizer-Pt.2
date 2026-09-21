@@ -52,9 +52,9 @@
 
   function seedCircle(cx, cy, r, vVal=0.8) {
     const r2 = r*r;
-    for (let y = Math.max(0, cy-r); y < Math.min(H, cy+r); y++) {
+    for (let y = Math.max(0, cy-r); y <= Math.min(H-1, cy+r); y++) {
       const dy = y - cy;
-      for (let x = Math.max(0, cx-r); x < Math.min(W, cx+r); x++) {
+      for (let x = Math.max(0, cx-r); x <= Math.min(W-1, cx+r); x++) {
         const dx = x - cx;
         if (dx*dx + dy*dy <= r2) {
           const i = idx(x,y);
