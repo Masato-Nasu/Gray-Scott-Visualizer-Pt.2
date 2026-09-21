@@ -4,7 +4,7 @@ self.addEventListener('message', (e) => {
   }
 });
 
-const VERSION = 'rd-cpu-v2026-09-22-symmetry-1';
+const VERSION = 'rd-cpu-v2026-09-22-symmetry-2';
 const ASSETS = [
   './',
   './index.html',
